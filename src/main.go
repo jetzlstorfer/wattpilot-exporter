@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 
 	"github.com/jetzlstorfer/wattpilot-exporter/parser"
+	"github.com/joho/godotenv"
 )
 
 type WattpilotData struct {
@@ -39,6 +41,12 @@ const wattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&fro
 
 func main() {
 
+	// get env variables from .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
 	myUrl, err := url.Parse(wattpilotDataUrl)
 	if err != nil {
 		log.Fatal(err)
@@ -46,7 +54,7 @@ func main() {
 	values := myUrl.Query()
 	values.Set("from", "1725141600000")
 	values.Set(("to"), "1727726340000")
-	values.Set("e", "T_LiSArY6sNLwrqIv37GXDVuivwH5cmkLqjMK23jpROAEJAJSG3ws8x4YcErxFXXWDu-2xwOjs5ln_E")
+	values.Set("e", os.Getenv("WATTPILOT_KEY"))
 	myUrl.RawQuery = values.Encode()
 
 	// fmt.Println(myUrl.String())
