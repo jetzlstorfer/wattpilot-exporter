@@ -4,15 +4,22 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"net/http"
+	"html/template"
 
 	"github.com/jetzlstorfer/wattpilot-exporter/parser"
 	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
 	"github.com/joho/godotenv"
 )
 
+type Data struct {
+	TotalEnergy float64
+	TotalPrice  float64
+}
+
 const wattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 
-func main() {
+func calculateData() (Data, error) {
 
 	// get env variables from .env file
 	err := godotenv.Load()
@@ -57,4 +64,24 @@ func main() {
 	fmt.Println("Total Energy in kWh:", totalEnergy)
 	fmt.Println("Total Energy in €:", totalPrice)
 
+	return Data{TotalEnergy: totalEnergy, TotalPrice: totalPrice}, nil
+
+
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	data, err := calculateData()
+	if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+	}
+
+	tmpl := template.Must(template.ParseFiles("template.html"))
+	tmpl.Execute(w, data)
+}
+
+func main() {
+	http.HandleFunc("/", handler)
+	log.Println("Starting server on :8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
