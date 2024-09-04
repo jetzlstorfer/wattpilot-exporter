@@ -12,8 +12,6 @@ on:
   # Allow mannually trigger 
   workflow_dispatch:      
 
-permissions:
-  id-token: write
 
 jobs:
   build:
