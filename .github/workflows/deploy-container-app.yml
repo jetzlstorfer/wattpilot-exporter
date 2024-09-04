@@ -35,7 +35,8 @@ jobs:
         with:
           push: true
           tags: jetzlstorfer/wattpilot-export:${{ github.sha }}
-          file: ./src/Dockerfile
+          working-directory: src
+          # file: ./src/Dockerfile
           build-args: GIT_SHA=${{ github.sha }}
           #context: ./src/
 
