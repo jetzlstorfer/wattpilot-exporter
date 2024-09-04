@@ -20,6 +20,7 @@ WORKDIR /
 
 # Copy the Pre-built binary file from the previous stage
 COPY --from=builder /wattpilot-export .
+COPY --from=builder /app/template.html .
 
 EXPOSE 8080
 

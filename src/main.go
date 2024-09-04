@@ -24,7 +24,8 @@ func calculateData() (Data, error) {
 	// get env variables from .env file
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		//log.Fatal("Error loading .env file")
+		log.Println("Error loading .env file: " + err.Error())
 	}
 
 	firstMonthToCalculate := "2024-08"
@@ -36,7 +37,7 @@ func calculateData() (Data, error) {
 	key := os.Getenv("WATTPILOT_KEY")
 	myUrl := wattpilotutils.PrepUrl(wattpilotDataUrl, from, to, key)
 
-	// fmt.Println(myUrl.String())
+	fmt.Println(myUrl)
 
 	// Fetch JSON document from the web
 	jsonData, err := parser.FetchJSON(myUrl)

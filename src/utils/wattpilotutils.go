@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 	"fmt"
+	_ "time/tzdata"
 )
 
 const OfficialPricePerKwh = 0.33182
@@ -52,13 +53,19 @@ func PrepUrl(wattpilotDataUrl string, from string, to string, key string) string
 
 func GetUnixTimestampStart(yearMonth string) string {
 	// year-month into unix timestamp
-	loc, _ := time.LoadLocation("Europe/Vienna")
+	loc, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		log.Fatal(err)
+	}
 	t, _ := time.Parse("2006-01", yearMonth)
 	return strconv.FormatInt(t.In(loc).Unix()*1000, 10)
 }
 func GetUnixTimestampEnd(yearMonth string) string {
 	// year-month into unix timestamp
-	loc, _ := time.LoadLocation("Europe/Vienna")
+	loc, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		log.Fatal(err)
+	}
 	t, _ := time.Parse("2006-01", yearMonth)
 
 	// add one month
