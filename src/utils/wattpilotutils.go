@@ -3,7 +3,12 @@ package wattpilotutils
 import (
 	"log"
 	"net/url"
+	"strconv"
+	"time"
+	"fmt"
 )
+
+const OfficialPricePerKwh = 0.33182
 
 type WattpilotData struct {
 	Columns []struct {
@@ -17,7 +22,7 @@ type WattpilotData struct {
 		SessionIdentifier string  `json:"session_identifier"`
 		IDChip            string  `json:"id_chip"`
 		IDChipName        string  `json:"id_chip_name"`
-		Eco               int     `json:"eco"`
+		Eco               float64     `json:"eco"`
 		Nexttrip          int     `json:"nexttrip"`
 		Start             string  `json:"start"`
 		End               string  `json:"end"`
@@ -43,4 +48,25 @@ func PrepUrl(wattpilotDataUrl string, from string, to string, key string) string
 	values.Set("e", key)
 	myUrl.RawQuery = values.Encode()
 	return myUrl.String()
+}
+
+func GetUnixTimestampStart(yearMonth string) string {
+	// year-month into unix timestamp
+	loc, _ := time.LoadLocation("Europe/Vienna")
+	t, _ := time.Parse("2006-01", yearMonth)
+	return strconv.FormatInt(t.In(loc).Unix()*1000, 10)
+}
+func GetUnixTimestampEnd(yearMonth string) string {
+	// year-month into unix timestamp
+	loc, _ := time.LoadLocation("Europe/Vienna")
+	t, _ := time.Parse("2006-01", yearMonth)
+
+	// add one month
+	t = t.AddDate(0, 1, 0)
+	// subtract one second to get last date of the month
+	t = t.Add(-1 * time.Second)
+	
+	fmt.Println(t)
+
+	return strconv.FormatInt(t.In(loc).Unix()*1000, 10)
 }

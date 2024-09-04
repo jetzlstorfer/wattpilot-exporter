@@ -20,8 +20,12 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	from := "1725141600000"
-	to := "1727726340000"
+	firstMonthToCalculate := "2024-08"
+	// currentMonth := time.Now().Format("2006-01")
+
+	// year-month into unix timestamp
+	from := wattpilotutils.GetUnixTimestampStart(firstMonthToCalculate)
+	to := wattpilotutils.GetUnixTimestampEnd(firstMonthToCalculate)
 	key := os.Getenv("WATTPILOT_KEY")
 	myUrl := wattpilotutils.PrepUrl(wattpilotDataUrl, from, to, key)
 
@@ -39,16 +43,18 @@ func main() {
 		log.Fatalf("Failed to parse JSON: %v", err)
 	}
 
-	// Calculate total energy
+	// Calculate total energy & price
 	totalEnergy := 0.0
+	totalPrice := 0.0
 
 	// loop over the data
 	for _, data := range parsedData.Data {
 		totalEnergy += data.Energy
-		// fmt.Println(data.Energy)
+		// TODO also take eco mode into consideration
+		totalPrice += data.Energy * wattpilotutils.OfficialPricePerKwh
 	}
 
 	fmt.Println("Total Energy in kWh:", totalEnergy)
-	fmt.Println("Total Energy in €:", totalEnergy*0.33182)
+	fmt.Println("Total Energy in €:", totalPrice)
 
 }
