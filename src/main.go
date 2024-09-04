@@ -3,41 +3,14 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 
 	"github.com/jetzlstorfer/wattpilot-exporter/parser"
+	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
 	"github.com/joho/godotenv"
 )
 
-type WattpilotData struct {
-	Columns []struct {
-		Key  string `json:"key"`
-		Hide bool   `json:"hide,omitempty"`
-		Unit string `json:"unit,omitempty"`
-		Type string `json:"type,omitempty"`
-	} `json:"columns"`
-	Data []struct {
-		SessionNumber     int     `json:"session_number"`
-		SessionIdentifier string  `json:"session_identifier"`
-		IDChip            string  `json:"id_chip"`
-		IDChipName        string  `json:"id_chip_name"`
-		Eco               int     `json:"eco"`
-		Nexttrip          int     `json:"nexttrip"`
-		Start             string  `json:"start"`
-		End               string  `json:"end"`
-		SecondsTotal      string  `json:"seconds_total"`
-		SecondsCharged    string  `json:"seconds_charged"`
-		MaxPower          float64 `json:"max_power"`
-		MaxCurrent        float64 `json:"max_current"`
-		Energy            float64 `json:"energy"`
-		EtoStart          float64 `json:"eto_start"`
-		EtoEnd            float64 `json:"eto_end"`
-		Link              string  `json:"link"`
-	} `json:"data"`
-}
-
-const wattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna" // Replace with the actual URL of the JSON document
+const wattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 
 func main() {
 
@@ -47,20 +20,15 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	myUrl, err := url.Parse(wattpilotDataUrl)
-	if err != nil {
-		log.Fatal(err)
-	}
-	values := myUrl.Query()
-	values.Set("from", "1725141600000")
-	values.Set(("to"), "1727726340000")
-	values.Set("e", os.Getenv("WATTPILOT_KEY"))
-	myUrl.RawQuery = values.Encode()
+	from := "1725141600000"
+	to := "1727726340000"
+	key := os.Getenv("WATTPILOT_KEY")
+	myUrl := wattpilotutils.PrepUrl(wattpilotDataUrl, from, to, key)
 
 	// fmt.Println(myUrl.String())
 
 	// Fetch JSON document from the web
-	jsonData, err := parser.FetchJSON(myUrl.String())
+	jsonData, err := parser.FetchJSON(myUrl)
 	if err != nil {
 		log.Fatalf("Failed to fetch JSON: %v", err)
 	}
