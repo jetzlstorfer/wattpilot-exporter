@@ -81,11 +81,17 @@ func GetUnixTimestampEnd(yearMonth string) string {
 func GetPrevMonth(yearMonth string) string {
 	t, _ := time.Parse("2006-01", yearMonth)
 	t = t.AddDate(0, -1, 0)
+	if t.Before(time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)) {
+		return ""
+	}
 	return t.Format("2006-01")
 }
 
 func GetNextMonth(yearMonth string) string {
 	t, _ := time.Parse("2006-01", yearMonth)
 	t = t.AddDate(0, 1, 0)
+	if t.After(time.Now()) {
+		return ""
+	}
 	return t.Format("2006-01")
 }
