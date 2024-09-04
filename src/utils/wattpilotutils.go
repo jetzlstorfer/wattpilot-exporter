@@ -1,11 +1,11 @@
 package wattpilotutils
 
 import (
+	"fmt"
 	"log"
 	"net/url"
 	"strconv"
 	"time"
-	"fmt"
 	_ "time/tzdata"
 )
 
@@ -23,7 +23,7 @@ type WattpilotData struct {
 		SessionIdentifier string  `json:"session_identifier"`
 		IDChip            string  `json:"id_chip"`
 		IDChipName        string  `json:"id_chip_name"`
-		Eco               float64     `json:"eco"`
+		Eco               float64 `json:"eco"`
 		Nexttrip          int     `json:"nexttrip"`
 		Start             string  `json:"start"`
 		End               string  `json:"end"`
@@ -72,8 +72,20 @@ func GetUnixTimestampEnd(yearMonth string) string {
 	t = t.AddDate(0, 1, 0)
 	// subtract one second to get last date of the month
 	t = t.Add(-1 * time.Second)
-	
+
 	fmt.Println(t)
 
 	return strconv.FormatInt(t.In(loc).Unix()*1000, 10)
+}
+
+func GetPrevMonth(yearMonth string) string {
+	t, _ := time.Parse("2006-01", yearMonth)
+	t = t.AddDate(0, -1, 0)
+	return t.Format("2006-01")
+}
+
+func GetNextMonth(yearMonth string) string {
+	t, _ := time.Parse("2006-01", yearMonth)
+	t = t.AddDate(0, 1, 0)
+	return t.Format("2006-01")
 }

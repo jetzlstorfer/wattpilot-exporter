@@ -7,8 +7,9 @@
     <title>Energy and Price Calculator</title>
 </head>
 <body>
-    <h1>Energy and Price Calculator</h1>
-    <p>Total Energy in kWh: {{.TotalEnergy}}</p>
-    <p>Total Price in €: {{.TotalPrice}}</p>
+    <h1>Wattpilot Energy and Price Calculator</h1>
+    <p><a href="?date={{ .PrevMonth }}">{{ .PrevMonth }}</a> <strong>{{ .Date }}</strong> <a href="?date={{ .NextMonth }}">{{ .NextMonth }}</a></a></p>
+    <p>Total Energy: {{ printf "%.2f" .TotalEnergy}} kWh</p>
+    <p>Total Price: {{printf "%.2f" .TotalPrice}} €</p>
 </body>
 </html>

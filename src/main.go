@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"os"
-	"net/http"
 	"html/template"
+	"log"
+	"net/http"
+	"os"
+	"time"
 
 	"github.com/jetzlstorfer/wattpilot-exporter/parser"
 	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
@@ -13,13 +14,16 @@ import (
 )
 
 type Data struct {
+	Date        string
+	PrevMonth   string
+	NextMonth   string
 	TotalEnergy float64
 	TotalPrice  float64
 }
 
 const wattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 
-func calculateData() (Data, error) {
+func calculateData(date string) (Data, error) {
 
 	// get env variables from .env file
 	err := godotenv.Load()
@@ -28,12 +32,14 @@ func calculateData() (Data, error) {
 		log.Println("Error loading .env file: " + err.Error())
 	}
 
-	firstMonthToCalculate := "2024-08"
-	// currentMonth := time.Now().Format("2006-01")
+	monthToCalculate := time.Now().Format("2006-01")
+	if date != "" {
+		monthToCalculate = date
+	}
 
 	// year-month into unix timestamp
-	from := wattpilotutils.GetUnixTimestampStart(firstMonthToCalculate)
-	to := wattpilotutils.GetUnixTimestampEnd(firstMonthToCalculate)
+	from := wattpilotutils.GetUnixTimestampStart(monthToCalculate)
+	to := wattpilotutils.GetUnixTimestampEnd(monthToCalculate)
 	key := os.Getenv("WATTPILOT_KEY")
 	myUrl := wattpilotutils.PrepUrl(wattpilotDataUrl, from, to, key)
 
@@ -62,19 +68,25 @@ func calculateData() (Data, error) {
 		totalPrice += data.Energy * wattpilotutils.OfficialPricePerKwh
 	}
 
+	fmt.Println(monthToCalculate)
 	fmt.Println("Total Energy in kWh:", totalEnergy)
 	fmt.Println("Total Energy in €:", totalPrice)
 
-	return Data{TotalEnergy: totalEnergy, TotalPrice: totalPrice}, nil
-
+	return Data{
+		Date:        monthToCalculate,
+		PrevMonth:   wattpilotutils.GetPrevMonth(monthToCalculate),
+		NextMonth:   wattpilotutils.GetNextMonth(monthToCalculate),
+		TotalEnergy: totalEnergy,
+		TotalPrice:  totalPrice}, nil
 
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	data, err := calculateData()
+	date := r.URL.Query().Get("date")
+	data, err := calculateData(date)
 	if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	tmpl := template.Must(template.ParseFiles("template.html"))
