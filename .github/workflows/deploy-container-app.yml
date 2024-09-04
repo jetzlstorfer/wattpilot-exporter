@@ -52,8 +52,8 @@ jobs:
           client-id: ${{ secrets.WATTPILOT_AZURE_CLIENT_ID }}
           subscription-id: ${{ secrets.WATTPILOT_AZURE_SUBSCRIPTION_ID }}
           tenant-id: ${{ secrets.WATTPILOT_AZURE_TENANT_ID }}
-        permissions:
-          id-token: write
+          permissions:
+            id-token: write
 
 
       - name: Deploy to containerapp
