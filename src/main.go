@@ -14,11 +14,13 @@ import (
 )
 
 type Data struct {
-	Date        string
-	PrevMonth   string
-	NextMonth   string
-	TotalEnergy float64
-	TotalPrice  float64
+	Date             string
+	PrevMonth        string
+	NextMonth        string
+	ChargingSessions int
+	LatestSession    string
+	TotalEnergy      float64
+	TotalPrice       float64
 }
 
 const wattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
@@ -60,12 +62,14 @@ func calculateData(date string) (Data, error) {
 	// Calculate total energy & price
 	totalEnergy := 0.0
 	totalPrice := 0.0
+	latestSession := ""
 
 	// loop over the data
 	for _, data := range parsedData.Data {
 		totalEnergy += data.Energy
 		// TODO also take eco mode into consideration
-		totalPrice += data.Energy * wattpilotutils.OfficialPricePerKwh
+		totalPrice += data.Energy * (data.Eco / 100) * wattpilotutils.OfficialPricePerKwh
+		latestSession = data.Start
 	}
 
 	fmt.Println(monthToCalculate)
@@ -73,11 +77,13 @@ func calculateData(date string) (Data, error) {
 	fmt.Println("Total Energy in €:", totalPrice)
 
 	return Data{
-		Date:        monthToCalculate,
-		PrevMonth:   wattpilotutils.GetPrevMonth(monthToCalculate),
-		NextMonth:   wattpilotutils.GetNextMonth(monthToCalculate),
-		TotalEnergy: totalEnergy,
-		TotalPrice:  totalPrice}, nil
+		Date:             monthToCalculate,
+		PrevMonth:        wattpilotutils.GetPrevMonth(monthToCalculate),
+		NextMonth:        wattpilotutils.GetNextMonth(monthToCalculate),
+		ChargingSessions: len(parsedData.Data),
+		LatestSession:    latestSession,
+		TotalEnergy:      totalEnergy,
+		TotalPrice:       totalPrice}, nil
 
 }
 
