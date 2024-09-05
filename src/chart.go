@@ -58,12 +58,21 @@ func barChart() *charts.Bar {
 			Subtitle: "Bar chart rendered by the http server this time",
 		}),
 		charts.WithTooltipOpts(opts.Tooltip{
-			Show: opts.Bool(true),
-			//Trigger:        "axis",
+			Show:      opts.Bool(true),
 			Trigger:   "item",
 			Formatter: "{c} {a}",
-			//ValueFormatter: "(value) => `${value.toFixed(2)}%`",
 		}),
+		charts.WithDataZoomOpts(opts.DataZoom{
+			Type:  "slider",
+			Start: 0,
+			End:   100,
+		}),
+		charts.WithLegendOpts(opts.Legend{
+
+			Selected: map[string]bool{
+				"kWh": true,
+				"€":   false,
+			}}),
 	)
 
 	months := []string{"2024-06", "2024-07", "2024-08", "2024-09"}
