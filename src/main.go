@@ -5,10 +5,8 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
-	"github.com/jetzlstorfer/wattpilot-exporter/parser"
 	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
 	"github.com/joho/godotenv"
 )
@@ -24,39 +22,14 @@ type Data struct {
 	TotalPrice       float64
 }
 
-const wattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
-
 func calculateData(date string) (Data, error) {
-
-	// get env variables from .env file
-	err := godotenv.Load()
-	if err != nil {
-		//log.Fatal("Error loading .env file")
-		log.Println("Error loading .env file: " + err.Error())
-	}
 
 	monthToCalculate := time.Now().Format("2006-01")
 	if date != "" {
 		monthToCalculate = date
 	}
 
-	// year-month into unix timestamp
-	from := wattpilotutils.GetUnixTimestampStart(monthToCalculate)
-	to := wattpilotutils.GetUnixTimestampEnd(monthToCalculate)
-	key := os.Getenv("WATTPILOT_KEY")
-	myUrl := wattpilotutils.PrepUrl(wattpilotDataUrl, from, to, key)
-
-	// Fetch JSON document from the web
-	jsonData, err := parser.FetchJSON(myUrl)
-	if err != nil {
-		log.Fatalf("Failed to fetch JSON: %v", err)
-	}
-
-	// Parse JSON document
-	parsedData, err := parser.ParseJSON(jsonData)
-	if err != nil {
-		log.Fatalf("Failed to parse JSON: %v", err)
-	}
+	parsedData := wattpilotutils.GetStatsForMonth(monthToCalculate)
 
 	// Calculate total energy & price
 	totalEnergy := 0.0
@@ -71,13 +44,15 @@ func calculateData(date string) (Data, error) {
 		latestSession = data.End
 	}
 	activeSession := false
+	loc, _ := time.LoadLocation("Europe/Berlin")
 	latestSessionTimeStamp, _ := time.Parse(time.DateTime, latestSession)
-	if latestSessionTimeStamp.Add(1 * time.Minute).After(time.Now()) {
+	latestSessionTimeStamp = latestSessionTimeStamp.Add(-2 * time.Hour) // fix for timezone
+
+	if latestSessionTimeStamp.Add(1 * time.Minute).After(time.Now().In(loc)) {
 		// session is active
 		activeSession = true
 	}
 
-	fmt.Println(monthToCalculate)
 	fmt.Println("Total Energy in kWh:", totalEnergy)
 	fmt.Println("Total Energy in €:", totalPrice)
 
@@ -106,7 +81,16 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+
+	// get env variables from .env file
+	err := godotenv.Load()
+	if err != nil {
+		//log.Fatal("Error loading .env file")
+		log.Println("Error loading .env file: " + err.Error())
+	}
+
 	http.HandleFunc("/", handler)
+	http.HandleFunc("/charts", chartHandler)
 	log.Println("Starting server on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

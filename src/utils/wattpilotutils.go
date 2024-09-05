@@ -1,14 +1,22 @@
 package wattpilotutils
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
 	"log"
+	"math"
+	"net/http"
 	"net/url"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 	_ "time/tzdata"
 )
 
 const OfficialPricePerKwh = 0.33182
+const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 
 type WattpilotData struct {
 	Columns []struct {
@@ -35,6 +43,31 @@ type WattpilotData struct {
 		EtoEnd            float64 `json:"eto_end"`
 		Link              string  `json:"link"`
 	} `json:"data"`
+}
+
+// ParseJSON takes a JSON document as input and returns a parsed representation of the JSON data.
+func ParseJSON(jsonData []byte) (WattpilotData, error) {
+	var parsedData WattpilotData
+	err := json.Unmarshal(jsonData, &parsedData)
+	if err != nil {
+		return parsedData, fmt.Errorf("failed to parse JSON: %v", err)
+	}
+	return parsedData, nil
+}
+
+// FetchJSON fetches a JSON document from the specified URL.
+func FetchJSON(url string) ([]byte, error) {
+	response, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch JSON: %v", err)
+	}
+	defer response.Body.Close()
+
+	jsonData, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read JSON data: %v", err)
+	}
+	return jsonData, nil
 }
 
 func PrepUrl(wattpilotDataUrl string, from string, to string, key string) string {
@@ -90,4 +123,38 @@ func GetNextMonth(yearMonth string) string {
 		return ""
 	}
 	return t.Format("2006-01")
+}
+
+func GetStatsForMonth(monthToCalculate string) WattpilotData {
+	// year-month into unix timestamp
+	from := GetUnixTimestampStart(monthToCalculate)
+	to := GetUnixTimestampEnd(monthToCalculate)
+	key := os.Getenv("WATTPILOT_KEY")
+	myUrl := PrepUrl(WattpilotDataUrl, from, to, key)
+
+	// Fetch JSON document from the web
+	jsonData, err := FetchJSON(myUrl)
+	if err != nil {
+		log.Fatalf("Failed to fetch JSON: %v", err)
+	}
+
+	// Parse JSON document
+	parsedData, err := ParseJSON(jsonData)
+	if err != nil {
+		log.Fatalf("Failed to parse JSON: %v", err)
+	}
+	return parsedData
+}
+
+func GetStatsForMonths(months []string) []WattpilotData {
+	var data []WattpilotData
+	for _, month := range months {
+		data = append(data, GetStatsForMonth(strings.TrimSpace(month)))
+	}
+	return data
+}
+
+func RoundFloat(val float64, precision uint) float64 {
+	ratio := math.Pow(10, float64(precision))
+	return math.Round(val*ratio) / ratio
 }
