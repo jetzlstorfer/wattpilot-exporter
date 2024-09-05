@@ -72,10 +72,7 @@ func calculateData(date string) (Data, error) {
 	}
 	activeSession := false
 	latestSessionTimeStamp, _ := time.Parse(time.DateTime, latestSession)
-	fmt.Println("data.end:", latestSession)
-	fmt.Println("latestSessionTimeStamp: ", latestSessionTimeStamp)
 	if latestSessionTimeStamp.Add(1 * time.Minute).After(time.Now()) {
-
 		// session is active
 		activeSession = true
 	}
