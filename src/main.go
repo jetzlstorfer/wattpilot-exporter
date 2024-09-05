@@ -19,6 +19,7 @@ type Data struct {
 	NextMonth        string
 	ChargingSessions int
 	LatestSession    string
+	IsCharging       bool
 	TotalEnergy      float64
 	TotalPrice       float64
 }
@@ -45,8 +46,6 @@ func calculateData(date string) (Data, error) {
 	key := os.Getenv("WATTPILOT_KEY")
 	myUrl := wattpilotutils.PrepUrl(wattpilotDataUrl, from, to, key)
 
-	fmt.Println(myUrl)
-
 	// Fetch JSON document from the web
 	jsonData, err := parser.FetchJSON(myUrl)
 	if err != nil {
@@ -67,9 +66,18 @@ func calculateData(date string) (Data, error) {
 	// loop over the data
 	for _, data := range parsedData.Data {
 		totalEnergy += data.Energy
-		// TODO also take eco mode into consideration
+		// TODO also take eco mode into consideration in a correct way
 		totalPrice += data.Energy * (data.Eco / 100) * wattpilotutils.OfficialPricePerKwh
-		latestSession = data.Start
+		latestSession = data.End
+	}
+	activeSession := false
+	latestSessionTimeStamp, _ := time.Parse(time.DateTime, latestSession)
+	fmt.Println("data.end:", latestSession)
+	fmt.Println("latestSessionTimeStamp: ", latestSessionTimeStamp)
+	if latestSessionTimeStamp.Add(1 * time.Minute).After(time.Now()) {
+
+		// session is active
+		activeSession = true
 	}
 
 	fmt.Println(monthToCalculate)
@@ -82,6 +90,7 @@ func calculateData(date string) (Data, error) {
 		NextMonth:        wattpilotutils.GetNextMonth(monthToCalculate),
 		ChargingSessions: len(parsedData.Data),
 		LatestSession:    latestSession,
+		IsCharging:       activeSession,
 		TotalEnergy:      totalEnergy,
 		TotalPrice:       totalPrice}, nil
 

@@ -10,7 +10,11 @@
     <h1>Wattpilot Energy and Price Calculator</h1>
     <p><a href="?date={{ .PrevMonth }}">{{ .PrevMonth }}</a> <strong>{{ .Date }}</strong> <a href="?date={{ .NextMonth }}">{{ .NextMonth }}</a></a></p>
     <p>Total Energy: {{ printf "%.2f" .TotalEnergy}} kWh  ({{ .ChargingSessions }} sessions)<br>
-    <small>Latest charging session: {{ .LatestSession }}</small></p>
+    {{ if .IsCharging }}
+        <p><strong>Currently charging ⚡</strong></p>
+    {{ else }}
+        <small>Latest charging session: {{ .LatestSession }}</small>
+    {{ end }}
     <p>Total Price (for reimbursement): <strong>{{printf "%.2f" .TotalPrice}} €</strong></p>
 </body>
 </html>

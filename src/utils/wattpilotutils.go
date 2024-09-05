@@ -1,7 +1,6 @@
 package wattpilotutils
 
 import (
-	"fmt"
 	"log"
 	"net/url"
 	"strconv"
@@ -72,9 +71,6 @@ func GetUnixTimestampEnd(yearMonth string) string {
 	t = t.AddDate(0, 1, 0)
 	// subtract one second to get last date of the month
 	t = t.Add(-1 * time.Second)
-
-	fmt.Println(t)
-
 	return strconv.FormatInt(t.In(loc).Unix()*1000, 10)
 }
 
