@@ -1,6 +1,6 @@
-# Wattpilot-exporter
+# Wattpilot Data Exporter ⚡
 
-fetching data from wattpilot exporter and calculating how much has been charged, based on the official numbers (1)
+fetching data from wattpilot and calculating how much has been charged, based on the official numbers (1)
 
 ## Run it
 
