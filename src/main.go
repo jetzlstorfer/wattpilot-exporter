@@ -68,7 +68,7 @@ func calculateData(date string) (Data, error) {
 
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func mainHandler(w http.ResponseWriter, r *http.Request) {
 	date := r.URL.Query().Get("date")
 	data, err := calculateData(date)
 	if err != nil {
@@ -80,6 +80,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, data)
 }
 
+func faviconHandler(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "favicon.ico")
+}
+
 func main() {
 
 	// get env variables from .env file
@@ -89,7 +93,8 @@ func main() {
 		log.Println("Error loading .env file: " + err.Error())
 	}
 
-	http.HandleFunc("/", handler)
+	http.HandleFunc("/", mainHandler)
+	http.HandleFunc("/favicon.ico", faviconHandler)
 	http.HandleFunc("/charts", chartHandler)
 	log.Println("Starting server on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
