@@ -21,6 +21,7 @@ WORKDIR /
 # Copy the Pre-built binary file from the previous stage
 COPY --from=builder /wattpilot-export .
 COPY --from=builder /app/template.html .
+COPY --from=builder /app/favicon.ico .
 
 EXPOSE 8080
 

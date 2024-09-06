@@ -24,3 +24,9 @@ run:
 # Clean the build artifacts
 clean:
 	rm -f $(EXECUTABLE)
+
+make docker-build:
+	docker build -t jetzlstorfer/wattpilot-exporter:local .
+
+make docker-run:
+	docker run -p 8080:8080 jetzlstorfer/wattpilot-exporter:local
