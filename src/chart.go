@@ -68,7 +68,6 @@ func barChart() *charts.Bar {
 			End:   100,
 		}),
 		charts.WithLegendOpts(opts.Legend{
-
 			Selected: map[string]bool{
 				"kWh": true,
 				"€":   false,

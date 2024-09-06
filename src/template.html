@@ -8,14 +8,22 @@
 </head>
 <body>
     <h1>Wattpilot Energy and Price Calculator</h1>
-    <p><a href="?date={{ .PrevMonth }}">{{ .PrevMonth }}</a> <strong>{{ .Date }}</strong> <a href="?date={{ .NextMonth }}">{{ .NextMonth }}</a></a></p>
-    <p>Total Energy: {{ printf "%.2f" .TotalEnergy}} kWh  ({{ .ChargingSessions }} sessions)<br>
+    <p>
+        {{ if .PrevMonth }}
+        ⬅️ <a href="?date={{ .PrevMonth }}">{{ .PrevMonth }}</a> | 
+        {{ end }} 
+        <strong>{{ .Date }}</strong> 
+        {{ if .NextMonth }}
+        | <a href="?date={{ .NextMonth }}">{{ .NextMonth }}</a> ➡️
+        {{ end }}
+    </p>
+    <p>⚡Total Energy: {{ printf "%.2f" .TotalEnergy}} kWh  ({{ .ChargingSessions }} sessions)<br>
     {{ if .IsCharging }}
-        <p><strong>Currently charging ⚡</strong></p>
+        <p><strong>⚡ Currently charging ⚡</strong></p>
     {{ else }}
         <small>Latest charging session: {{ .LatestSession }}</small>
     {{ end }}
-    <p>Total Price (for reimbursement): <strong>{{printf "%.2f" .TotalPrice}} €</strong></p>
+    <p>💰 Total Price (for reimbursement): <strong>{{printf "%.2f" .TotalPrice}} €</strong></p>
 
     <footer>
         <a href="/charts">Charts</a>
