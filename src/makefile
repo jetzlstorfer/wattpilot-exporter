@@ -25,8 +25,8 @@ run:
 clean:
 	rm -f $(EXECUTABLE)
 
-make docker-build:
+docker-build:
 	docker build -t jetzlstorfer/wattpilot-exporter:local .
 
-make docker-run:
-	docker run -p 8080:8080 jetzlstorfer/wattpilot-exporter:local
+docker-run:
+	docker run --env-file ./.env -p 8080:8080 jetzlstorfer/wattpilot-exporter:local
