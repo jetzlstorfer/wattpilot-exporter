@@ -34,13 +34,15 @@ func calculateData(date string) (Data, error) {
 	// Calculate total energy & price
 	totalEnergy := 0.0
 	totalPrice := 0.0
+	estimatedReimbursment := 0.0
 	latestSession := ""
 
 	// loop over the data
 	for _, data := range parsedData.Data {
 		totalEnergy += data.Energy
+		totalPrice += data.Energy * wattpilotutils.OfficialPricePerKwh
 		// TODO also take eco mode into consideration in a correct way
-		totalPrice += data.Energy * (data.Eco / 100) * wattpilotutils.OfficialPricePerKwh
+		estimatedReimbursment += data.Energy * (100 - data.Eco) / 100 * wattpilotutils.OfficialPricePerKwh
 		latestSession = data.End
 	}
 	activeSession := false

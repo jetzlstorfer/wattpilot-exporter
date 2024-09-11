@@ -24,7 +24,8 @@
     {{ else }}
         <small>Latest charging session: {{ .LatestSession }}</small>
     {{ end }}
-    <p>💰 Total Price (for reimbursement): <strong>{{printf "%.2f" .TotalPrice}} €</strong></p>
+    <p>💰 Total Price: <strong>{{printf "%.2f" .TotalPrice}} €</strong></p>
+    <p>Estimated margin: TBD</p>
 
     <footer>
         <a href="/charts">Charts</a>
