@@ -16,6 +16,7 @@ import (
 )
 
 const OfficialPricePerKwh = 0.33182
+const PurchasePricePerKwh = 0.19
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 
 type WattpilotData struct {
@@ -157,4 +158,17 @@ func GetStatsForMonths(months []string) []WattpilotData {
 func RoundFloat(val float64, precision uint) float64 {
 	ratio := math.Pow(10, float64(precision))
 	return math.Round(val*ratio) / ratio
+}
+
+func CalculatePrice(energy float64, eco float64) float64 {
+	return energy * OfficialPricePerKwh
+}
+
+func CalculatePriceMargin(energy float64, eco float64) float64 {
+	if eco == 100 {
+		return energy * OfficialPricePerKwh
+	} else {
+		// TODO calculate the correct ratio
+		return energy * (OfficialPricePerKwh - PurchasePricePerKwh)
+	}
 }

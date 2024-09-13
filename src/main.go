@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -20,6 +19,7 @@ type Data struct {
 	IsCharging       bool
 	TotalEnergy      float64
 	TotalPrice       float64
+	TotalMargin      float64
 }
 
 func calculateData(date string) (Data, error) {
@@ -34,15 +34,15 @@ func calculateData(date string) (Data, error) {
 	// Calculate total energy & price
 	totalEnergy := 0.0
 	totalPrice := 0.0
-	estimatedReimbursment := 0.0
+	totalMargin := 0.0
 	latestSession := ""
 
 	// loop over the data
 	for _, data := range parsedData.Data {
 		totalEnergy += data.Energy
-		totalPrice += data.Energy * wattpilotutils.OfficialPricePerKwh
+		totalPrice += wattpilotutils.CalculatePrice(data.Energy, 100)
 		// TODO also take eco mode into consideration in a correct way
-		estimatedReimbursment += data.Energy * (100 - data.Eco) / 100 * wattpilotutils.OfficialPricePerKwh
+		totalMargin += wattpilotutils.CalculatePriceMargin(data.Energy, data.Eco)
 		latestSession = data.End
 	}
 	activeSession := false
@@ -55,8 +55,8 @@ func calculateData(date string) (Data, error) {
 		activeSession = true
 	}
 
-	fmt.Println("Total Energy in kWh:", totalEnergy)
-	fmt.Println("Total Energy in €:", totalPrice)
+	// fmt.Println("Total Energy in kWh:", totalEnergy)
+	// fmt.Println("Total Energy in €:", totalPrice)
 
 	return Data{
 		Date:             monthToCalculate,
@@ -66,7 +66,8 @@ func calculateData(date string) (Data, error) {
 		LatestSession:    latestSession,
 		IsCharging:       activeSession,
 		TotalEnergy:      totalEnergy,
-		TotalPrice:       totalPrice}, nil
+		TotalPrice:       totalPrice,
+		TotalMargin:      totalMargin}, nil
 
 }
 

@@ -25,9 +25,10 @@
         <small>Latest charging session: {{ .LatestSession }}</small>
     {{ end }}
     <p>💰 Total Price: <strong>{{printf "%.2f" .TotalPrice}} €</strong></p>
-    <p>Estimated margin: TBD</p>
+    <p>💰 Estimated margin: <strong>{{printf "%.2f" .TotalMargin}} €</strong></p>
 
     <footer>
+        <a href="/info">Info</a> |
         <a href="/charts">Charts</a>
     </footer>
 </body>
