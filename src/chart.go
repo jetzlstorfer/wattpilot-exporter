@@ -52,10 +52,14 @@ func barChart() *charts.Bar {
 
 	// set some global options like Title/Legend/ToolTip or anything else
 	bar.SetGlobalOptions(
-		charts.WithInitializationOpts(opts.Initialization{Theme: types.ThemeWesteros}),
+		charts.WithInitializationOpts(opts.Initialization{
+			Theme:  types.ThemeWesteros,
+			Width:  "1200px",
+			Height: "600px",
+		}),
 		charts.WithTitleOpts(opts.Title{
-			Title:    "Stats",
-			Subtitle: "Bar chart rendered by the http server this time",
+			Title:    "Wattpilot Consumption Stats",
+			Subtitle: "Stats calculated from Wattpilot data",
 		}),
 		charts.WithTooltipOpts(opts.Tooltip{
 			Show:      opts.Bool(true),
@@ -69,8 +73,9 @@ func barChart() *charts.Bar {
 		}),
 		charts.WithLegendOpts(opts.Legend{
 			Selected: map[string]bool{
-				"kWh": true,
-				"€":   false,
+				"kWh":      true,
+				"€":        false,
+				"€ Margin": false,
 			}}),
 	)
 
@@ -79,22 +84,28 @@ func barChart() *charts.Bar {
 	data := wattpilotutils.GetStatsForMonths(months)
 	kwhData := make([]float64, 0)
 	euroData := make([]float64, 0)
+	marginData := make([]float64, 0)
+
 	for _, monthData := range data {
 		//fmt.Println(month.Data)
 		totalEnergy := 0.0
 		totalEuro := 0.0
+		totalMargin := 0.0
 		for _, month := range monthData.Data {
 			totalEnergy += month.Energy
-			totalEuro += month.Energy * (month.Eco / 100) * wattpilotutils.OfficialPricePerKwh
+			totalEuro += wattpilotutils.CalculatePrice(month.Energy, 100)
+			totalMargin += wattpilotutils.CalculatePriceMargin(month.Energy, month.Eco)
 		}
 
 		kwhData = append(kwhData, wattpilotutils.RoundFloat(totalEnergy, 2))
 		euroData = append(euroData, wattpilotutils.RoundFloat(totalEuro, 2))
+		marginData = append(marginData, wattpilotutils.RoundFloat(totalMargin, 2))
 	}
 	// Put data into instance
 	bar.SetXAxis(months).
 		AddSeries("kWh", generateBarItems(kwhData)).
-		AddSeries("€", generateBarItems(euroData))
+		AddSeries("€", generateBarItems(euroData)).
+		AddSeries("€ Margin", generateBarItems(marginData))
 	return bar
 }
 

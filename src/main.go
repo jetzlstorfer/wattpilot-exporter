@@ -41,7 +41,6 @@ func calculateData(date string) (Data, error) {
 	for _, data := range parsedData.Data {
 		totalEnergy += data.Energy
 		totalPrice += wattpilotutils.CalculatePrice(data.Energy, 100)
-		// TODO also take eco mode into consideration in a correct way
 		totalMargin += wattpilotutils.CalculatePriceMargin(data.Energy, data.Eco)
 		latestSession = data.End
 	}
