@@ -17,33 +17,38 @@ import (
 
 const OfficialPricePerKwh = 0.33182
 const PurchasePricePerKwh = 0.19
+const JSONFileName = "data.json"
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 
+type WattpilotColumn struct {
+	Key  string `json:"key"`
+	Hide bool   `json:"hide,omitempty"`
+	Unit string `json:"unit,omitempty"`
+	Type string `json:"type,omitempty"`
+}
+
 type WattpilotData struct {
-	Columns []struct {
-		Key  string `json:"key"`
-		Hide bool   `json:"hide,omitempty"`
-		Unit string `json:"unit,omitempty"`
-		Type string `json:"type,omitempty"`
-	} `json:"columns"`
-	Data []struct {
-		SessionNumber     int     `json:"session_number"`
-		SessionIdentifier string  `json:"session_identifier"`
-		IDChip            string  `json:"id_chip"`
-		IDChipName        string  `json:"id_chip_name"`
-		Eco               float64 `json:"eco"`
-		Nexttrip          int     `json:"nexttrip"`
-		Start             string  `json:"start"`
-		End               string  `json:"end"`
-		SecondsTotal      string  `json:"seconds_total"`
-		SecondsCharged    string  `json:"seconds_charged"`
-		MaxPower          float64 `json:"max_power"`
-		MaxCurrent        float64 `json:"max_current"`
-		Energy            float64 `json:"energy"`
-		EtoStart          float64 `json:"eto_start"`
-		EtoEnd            float64 `json:"eto_end"`
-		Link              string  `json:"link"`
-	} `json:"data"`
+	Columns []WattpilotColumn `json:"columns"`
+	Data    []WattpilotEntry  `json:"data"`
+}
+
+type WattpilotEntry struct {
+	SessionNumber     int     `json:"session_number"`
+	SessionIdentifier string  `json:"session_identifier"`
+	IDChip            string  `json:"id_chip"`
+	IDChipName        string  `json:"id_chip_name"`
+	Eco               float64 `json:"eco"`
+	Nexttrip          int     `json:"nexttrip"`
+	Start             string  `json:"start"`
+	End               string  `json:"end"`
+	SecondsTotal      string  `json:"seconds_total"`
+	SecondsCharged    string  `json:"seconds_charged"`
+	MaxPower          float64 `json:"max_power"`
+	MaxCurrent        float64 `json:"max_current"`
+	Energy            float64 `json:"energy"`
+	EtoStart          float64 `json:"eto_start"`
+	EtoEnd            float64 `json:"eto_end"`
+	Link              string  `json:"link"`
 }
 
 // ParseJSON takes a JSON document as input and returns a parsed representation of the JSON data.
@@ -64,11 +69,64 @@ func FetchJSON(url string) ([]byte, error) {
 	}
 	defer response.Body.Close()
 
+	log.Println("getting json data from url: ", url)
+
 	jsonData, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read JSON data: %v", err)
 	}
 	return jsonData, nil
+}
+
+func GetJSONData() ([]byte, error) {
+	jsonData, err := ReadJSONFile(JSONFileName)
+	if err != nil {
+		log.Printf("Failed to read JSON file: %v", err)
+		//return nil, fmt.Errorf("failed to read JSON data: %v", err)
+	}
+
+	if jsonData == nil {
+		log.Println("JSON file not found, fetching data from the web")
+		key := os.Getenv("WATTPILOT_KEY")
+		myUrl := PrepUrl(WattpilotDataUrl, "", "", key)
+
+		// Fetch JSON document from the web
+		jsonData, err := FetchJSON(myUrl)
+		if err != nil {
+			log.Fatalf("Failed to fetch JSON: %v", err)
+		}
+		saveJSONFile(JSONFileName, jsonData)
+	}
+
+	return jsonData, nil
+}
+
+func ReadJSONFile(filename string) ([]byte, error) {
+	jsonFile, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open JSON file: %v", err)
+	}
+	defer jsonFile.Close()
+
+	jsonData, err := io.ReadAll(jsonFile)
+	if err != nil {
+		return jsonData, fmt.Errorf("failed to read JSON data: %v", err)
+	}
+	return jsonData, nil
+}
+
+func saveJSONFile(filename string, jsonData []byte) error {
+	jsonFile, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("failed to create JSON file: %v", err)
+	}
+	defer jsonFile.Close()
+
+	_, err = jsonFile.Write(jsonData)
+	if err != nil {
+		return fmt.Errorf("failed to write JSON data: %v", err)
+	}
+	return nil
 }
 
 func PrepUrl(wattpilotDataUrl string, from string, to string, key string) string {
@@ -77,8 +135,13 @@ func PrepUrl(wattpilotDataUrl string, from string, to string, key string) string
 		log.Fatal(err)
 	}
 	values := myUrl.Query()
-	values.Set("from", from)
-	values.Set(("to"), to)
+	if from == "" || to == "" {
+		values.Del("from")
+		values.Del("to")
+	} else {
+		values.Set("from", from)
+		values.Set(("to"), to)
+	}
 	values.Set("e", key)
 	myUrl.RawQuery = values.Encode()
 	return myUrl.String()
@@ -128,13 +191,13 @@ func GetNextMonth(yearMonth string) string {
 
 func GetStatsForMonth(monthToCalculate string) WattpilotData {
 	// year-month into unix timestamp
-	from := GetUnixTimestampStart(monthToCalculate)
-	to := GetUnixTimestampEnd(monthToCalculate)
-	key := os.Getenv("WATTPILOT_KEY")
-	myUrl := PrepUrl(WattpilotDataUrl, from, to, key)
+	//from := GetUnixTimestampStart(monthToCalculate)
+	//to := GetUnixTimestampEnd(monthToCalculate)
+	//key := os.Getenv("WATTPILOT_KEY")
+	//myUrl := PrepUrl(WattpilotDataUrl, from, to, key)
 
 	// Fetch JSON document from the web
-	jsonData, err := FetchJSON(myUrl)
+	jsonData, err := GetJSONData()
 	if err != nil {
 		log.Fatalf("Failed to fetch JSON: %v", err)
 	}
@@ -144,7 +207,26 @@ func GetStatsForMonth(monthToCalculate string) WattpilotData {
 	if err != nil {
 		log.Fatalf("Failed to parse JSON: %v", err)
 	}
-	return parsedData
+
+	// now convert the data to the correct format
+	monthlyData := WattpilotData{}
+	monthlyData.Columns = parsedData.Columns
+
+	newData := []WattpilotEntry{}
+
+	for _, data := range parsedData.Data {
+		// fmt 29.06.2024 21:14:32
+		// https://gist.github.com/unstppbl/26942512b3ca6a92857c87124445ca0b
+		month, _ := time.Parse("02.01.2006 15:04:05", data.End)
+		fmt.Println("month: ", month)
+		if month.Format("2006-01") == monthToCalculate {
+			fmt.Println("found data for month: ", month)
+			newData = append(newData, data)
+		}
+	}
+
+	monthlyData.Data = newData
+	return monthlyData
 }
 
 func GetStatsForMonths(months []string) []WattpilotData {

@@ -24,6 +24,7 @@ run:
 # Clean the build artifacts
 clean:
 	rm -f $(EXECUTABLE)
+	rm -f data.json
 
 docker-build:
 	docker build -t jetzlstorfer/wattpilot-exporter:local .
