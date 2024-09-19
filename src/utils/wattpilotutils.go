@@ -55,7 +55,9 @@ type WattpilotEntry struct {
 func ParseJSON(jsonData []byte) (WattpilotData, error) {
 	var parsedData WattpilotData
 	err := json.Unmarshal(jsonData, &parsedData)
+	fmt.Println("jsonData: ", string(jsonData))
 	if err != nil {
+
 		return parsedData, fmt.Errorf("failed to parse JSON: %v", err)
 	}
 	return parsedData, nil
@@ -79,10 +81,9 @@ func FetchJSON(url string) ([]byte, error) {
 }
 
 func GetJSONData() ([]byte, error) {
-	jsonData, err := ReadJSONFile(JSONFileName)
+	jsonData, err := readJSONFile(JSONFileName)
 	if err != nil {
 		log.Printf("Failed to read JSON file: %v", err)
-		//return nil, fmt.Errorf("failed to read JSON data: %v", err)
 	}
 
 	if jsonData == nil {
@@ -92,16 +93,19 @@ func GetJSONData() ([]byte, error) {
 
 		// Fetch JSON document from the web
 		jsonData, err := FetchJSON(myUrl)
-		if err != nil {
+		if err != nil || jsonData == nil {
 			log.Fatalf("Failed to fetch JSON: %v", err)
 		}
-		saveJSONFile(JSONFileName, jsonData)
+		err = saveJSONFile(JSONFileName, jsonData)
+		if err != nil {
+			log.Fatalf("Failed to save JSON file: %v", err)
+		}
 	}
 
 	return jsonData, nil
 }
 
-func ReadJSONFile(filename string) ([]byte, error) {
+func readJSONFile(filename string) ([]byte, error) {
 	jsonFile, err := os.Open(filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open JSON file: %v", err)
@@ -218,9 +222,7 @@ func GetStatsForMonth(monthToCalculate string) WattpilotData {
 		// fmt 29.06.2024 21:14:32
 		// https://gist.github.com/unstppbl/26942512b3ca6a92857c87124445ca0b
 		month, _ := time.Parse("02.01.2006 15:04:05", data.End)
-		fmt.Println("month: ", month)
 		if month.Format("2006-01") == monthToCalculate {
-			fmt.Println("found data for month: ", month)
 			newData = append(newData, data)
 		}
 	}
