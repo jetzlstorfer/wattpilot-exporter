@@ -94,7 +94,7 @@ func GetJSONData() ([]byte, error) {
 		myUrl := PrepUrl(WattpilotDataUrl, "", "", key)
 
 		// Fetch JSON document from the web
-		jsonData, err = FetchJSON(myUrl)
+		jsonData, err := FetchJSON(myUrl)
 		if err != nil || jsonData == nil {
 			log.Fatalf("Failed to fetch JSON: %v", err)
 		}
