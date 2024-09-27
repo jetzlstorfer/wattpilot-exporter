@@ -86,6 +86,12 @@ func faviconHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "favicon.ico")
 }
 
+func refreshHandler(w http.ResponseWriter, r *http.Request) {
+	// refresh data
+	wattpilotutils.RefreshData()
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
 func main() {
 
 	// get env variables from .env file
@@ -97,6 +103,7 @@ func main() {
 
 	http.HandleFunc("/", mainHandler)
 	http.HandleFunc("/favicon.ico", faviconHandler)
+	http.HandleFunc("/refresh", refreshHandler)
 	http.HandleFunc("/charts", chartHandler)
 	log.Println("Starting server on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

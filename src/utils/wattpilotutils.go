@@ -55,7 +55,6 @@ type WattpilotEntry struct {
 func ParseJSON(jsonData []byte) (WattpilotData, error) {
 	var parsedData WattpilotData
 	err := json.Unmarshal(jsonData, &parsedData)
-	fmt.Println("jsonData: ", string(jsonData))
 	if err != nil {
 
 		return parsedData, fmt.Errorf("failed to parse JSON: %v", err)
@@ -81,20 +80,20 @@ func FetchJSON(url string) ([]byte, error) {
 }
 
 func GetJSONData() ([]byte, error) {
-	// Read JSON document from file
+	// Read JSON document from file.
 	jsonData, err := readJSONFile(JSONFileName)
 	if err != nil {
 		log.Printf("Failed to read JSON file: %v", err)
 	}
 
-	// If JSON file not found, fetch data from the web and store in file
+	// If JSON file not found, fetch data from the web and store in file.
 	if jsonData == nil {
 		log.Println("JSON file not found, fetching data from the web")
 		key := os.Getenv("WATTPILOT_KEY")
 		myUrl := PrepUrl(WattpilotDataUrl, "", "", key)
 
-		// Fetch JSON document from the web
-		jsonData, err := FetchJSON(myUrl)
+		// Fetch JSON document from the web.
+		jsonData, err = FetchJSON(myUrl) // Remove the redeclaration of jsonData
 		if err != nil || jsonData == nil {
 			log.Fatalf("Failed to fetch JSON: %v", err)
 		}
@@ -256,5 +255,21 @@ func CalculatePriceMargin(energy float64, eco float64) float64 {
 	} else {
 		// TODO calculate the correct ratio
 		return energy * (OfficialPricePerKwh - PurchasePricePerKwh)
+	}
+}
+
+func RefreshData() {
+	key := os.Getenv("WATTPILOT_KEY")
+	myUrl := PrepUrl(WattpilotDataUrl, "", "", key)
+	// Fetch JSON document from the web
+	jsonData, err := FetchJSON(myUrl)
+	if err != nil {
+		log.Fatalf("Failed to fetch JSON: %v", err)
+	}
+
+	// Save JSON document to file
+	err = saveJSONFile(JSONFileName, jsonData)
+	if err != nil {
+		log.Fatalf("Failed to save JSON file: %v", err)
 	}
 }
