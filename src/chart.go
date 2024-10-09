@@ -79,7 +79,13 @@ func barChart() *charts.Bar {
 			}}),
 	)
 
-	months := []string{"2024-06", "2024-07", "2024-08", "2024-09", "2024-10"}
+	// generate all months since June 2024
+	firstMonthWithData := "2024-06"
+	months := []string{firstMonthWithData}
+	for nextMonth := wattpilotutils.GetNextMonth(firstMonthWithData); nextMonth != ""; nextMonth = wattpilotutils.GetNextMonth(nextMonth) {
+		months = append(months, nextMonth)
+	}
+
 	// get data from wattpilot
 	data := wattpilotutils.GetStatsForMonths(months)
 	kwhData := make([]float64, 0)
