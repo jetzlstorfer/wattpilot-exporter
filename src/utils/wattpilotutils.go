@@ -16,7 +16,7 @@ import (
 )
 
 const OfficialPricePerKwh = 0.33182
-const PurchasePricePerKwh = 0.19
+const PurchasePricePerKwh = 0.2824
 const JSONFileName = "data.json"
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 
