@@ -18,7 +18,7 @@
         | <a href="?date={{ .NextMonth }}">{{ .NextMonth }}</a> ➡️
         {{ end }}
     </p>
-    <p>⚡Total Energy: {{ printf "%.2f" .TotalEnergy}} kWh  ({{ .ChargingSessions }} sessions)<br>
+    <p>⚡Total Energy: <strong>{{ printf "%.2f" .TotalEnergy}} kWh</strong> ({{ .ChargingSessions }} sessions)<br>
     {{ if .IsCharging }}
         <p><strong>⚡ Currently charging ⚡</strong></p>
     {{ else }}
