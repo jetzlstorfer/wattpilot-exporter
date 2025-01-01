@@ -40,8 +40,8 @@ func calculateData(date string) (Data, error) {
 	// loop over the data
 	for _, data := range parsedData.Data {
 		totalEnergy += data.Energy
-		totalPrice += wattpilotutils.CalculatePrice(data.Energy, 100)
-		totalMargin += wattpilotutils.CalculatePriceMargin(data.Energy, data.Eco)
+		totalPrice += wattpilotutils.CalculatePrice(data.End, data.Energy, 100)
+		totalMargin += wattpilotutils.CalculatePriceMargin(data.End, data.Energy, data.Eco)
 		latestSession = data.End
 	}
 	activeSession := false

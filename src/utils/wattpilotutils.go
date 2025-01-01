@@ -15,7 +15,8 @@ import (
 	_ "time/tzdata"
 )
 
-const OfficialPricePerKwh = 0.33182
+const OfficialPricePerKwh2024 = 0.33182
+const OfficialPricePerKwh2025 = 0.35889 // https://www.bmf.gv.at/themen/steuern/arbeitnehmerinnenveranlagung/pendlerfoerderung-das-pendlerpauschale/sachbezug-kraftfahrzeug.html
 const PurchasePricePerKwh = 0.2824
 const JSONFileName = "data.json"
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
@@ -247,16 +248,17 @@ func RoundFloat(val float64, precision uint) float64 {
 	return math.Round(val*ratio) / ratio
 }
 
-func CalculatePrice(energy float64, eco float64) float64 {
-	return energy * OfficialPricePerKwh
+func CalculatePrice(endTime string, energy float64, eco float64) float64 {
+	fmt.Println(endTime)
+	return energy * OfficialPricePerKwh2024
 }
 
-func CalculatePriceMargin(energy float64, eco float64) float64 {
+func CalculatePriceMargin(endTime string, energy float64, eco float64) float64 {
 	if eco == 100 {
-		return energy * OfficialPricePerKwh
+		return energy * OfficialPricePerKwh2024
 	} else {
 		// TODO calculate the correct ratio
-		return energy * (OfficialPricePerKwh - PurchasePricePerKwh)
+		return energy * (OfficialPricePerKwh2024 - PurchasePricePerKwh)
 	}
 }
 

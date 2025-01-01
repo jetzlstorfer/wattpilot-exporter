@@ -99,8 +99,8 @@ func barChart() *charts.Bar {
 		totalMargin := 0.0
 		for _, month := range monthData.Data {
 			totalEnergy += month.Energy
-			totalEuro += wattpilotutils.CalculatePrice(month.Energy, 100)
-			totalMargin += wattpilotutils.CalculatePriceMargin(month.Energy, month.Eco)
+			totalEuro += wattpilotutils.CalculatePrice(month.End, month.Energy, 100)
+			totalMargin += wattpilotutils.CalculatePriceMargin(month.End, month.Energy, month.Eco)
 		}
 
 		kwhData = append(kwhData, wattpilotutils.RoundFloat(totalEnergy, 2))
