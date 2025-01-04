@@ -17,7 +17,8 @@ import (
 
 const OfficialPricePerKwh2024 = 0.33182
 const OfficialPricePerKwh2025 = 0.35889 // https://www.bmf.gv.at/themen/steuern/arbeitnehmerinnenveranlagung/pendlerfoerderung-das-pendlerpauschale/sachbezug-kraftfahrzeug.html
-const PurchasePricePerKwh = 0.2824
+const PurchasePricePerKwh2024 = 0.2824
+const PurchasePricePerKwh2025 = 0.25
 const JSONFileName = "data.json"
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 
@@ -57,7 +58,6 @@ func ParseJSON(jsonData []byte) (WattpilotData, error) {
 	var parsedData WattpilotData
 	err := json.Unmarshal(jsonData, &parsedData)
 	if err != nil {
-
 		return parsedData, fmt.Errorf("failed to parse JSON: %v", err)
 	}
 	return parsedData, nil
@@ -248,17 +248,40 @@ func RoundFloat(val float64, precision uint) float64 {
 	return math.Round(val*ratio) / ratio
 }
 
+func getSellingPriceOfYear(timestamp string) float64 {
+	year, _ := time.Parse("02.01.2006 15:04:05", timestamp)
+	if year.Year() == 2024 {
+		return OfficialPricePerKwh2024
+	} else if year.Year() == 2025 {
+		return OfficialPricePerKwh2025
+	} else {
+		// set default to 2025 until we have no data for 2026
+		return OfficialPricePerKwh2025
+	}
+}
+
+func getPurchasePriceOfYear(timestamp string) float64 {
+	year, _ := time.Parse("02.01.2006 15:04:05", timestamp)
+	if year.Year() == 2024 {
+		return PurchasePricePerKwh2024
+	} else if year.Year() == 2025 {
+		return PurchasePricePerKwh2025
+	} else {
+		// set default to 2025 until we have no data for 2026
+		return PurchasePricePerKwh2025
+	}
+}
+
 func CalculatePrice(endTime string, energy float64, eco float64) float64 {
-	fmt.Println(endTime)
-	return energy * OfficialPricePerKwh2024
+	return energy * getSellingPriceOfYear(endTime)
 }
 
 func CalculatePriceMargin(endTime string, energy float64, eco float64) float64 {
 	if eco == 100 {
-		return energy * OfficialPricePerKwh2024
+		return energy * getSellingPriceOfYear(endTime)
 	} else {
 		// TODO calculate the correct ratio
-		return energy * (OfficialPricePerKwh2024 - PurchasePricePerKwh)
+		return energy * (getSellingPriceOfYear(endTime) - getPurchasePriceOfYear(endTime))
 	}
 }
 
