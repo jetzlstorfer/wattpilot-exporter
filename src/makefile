@@ -19,7 +19,11 @@ build:
 
 # Run the application
 run:
+	rm -f data.json
 	$(GO) run $(RUN_FLAGS) .
+
+run-cached: # don't delete data.json before running
+	$(GO) run $(RUN_FLAGS) . 
 
 # Clean the build artifacts
 clean:
