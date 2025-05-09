@@ -53,9 +53,9 @@ func barChart() *charts.Bar {
 	// set some global options like Title/Legend/ToolTip or anything else
 	bar.SetGlobalOptions(
 		charts.WithInitializationOpts(opts.Initialization{
-			Theme:  types.ThemeWesteros,
-			Width:  "1200px",
-			Height: "600px",
+			Theme: types.ThemeWesteros,
+			// Width:  "1200px",
+			// Height: "600px",
 		}),
 		charts.WithTitleOpts(opts.Title{
 			Title:    "Wattpilot Consumption Stats",
