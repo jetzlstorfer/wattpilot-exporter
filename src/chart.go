@@ -11,32 +11,6 @@ import (
 	"github.com/go-echarts/go-echarts/v2/types"
 )
 
-func genLiquidItems(data []float32) []opts.LiquidData {
-	items := make([]opts.LiquidData, 0)
-	for i := 0; i < len(data); i++ {
-		items = append(items, opts.LiquidData{Value: data[i]})
-	}
-	return items
-}
-
-func liquidArrow() *charts.Liquid {
-	liquid := charts.NewLiquid()
-	liquid.SetGlobalOptions(
-		charts.WithTitleOpts(opts.Title{
-			Title: "shape(Arrow)",
-		}),
-	)
-
-	liquid.AddSeries("electricity", genLiquidItems([]float32{0.3, 0.4, 0.5})).
-		SetSeriesOptions(
-			charts.WithLiquidChartOpts(opts.LiquidChart{
-				IsWaveAnimation: opts.Bool(true),
-				Shape:           "arrow",
-			}),
-		)
-	return liquid
-}
-
 // generate random data for bar chart
 func generateBarItems(data []float64) []opts.BarData {
 	items := make([]opts.BarData, 0)
