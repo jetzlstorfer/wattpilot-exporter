@@ -28,8 +28,6 @@ func barChart() *charts.Bar {
 	bar.SetGlobalOptions(
 		charts.WithInitializationOpts(opts.Initialization{
 			Theme: types.ThemeWesteros,
-			// Width:  "1200px",
-			// Height: "600px",
 		}),
 		charts.WithTitleOpts(opts.Title{
 			Title:    "Wattpilot Consumption Stats",
@@ -46,6 +44,9 @@ func barChart() *charts.Bar {
 			End:   100,
 		}),
 		charts.WithLegendOpts(opts.Legend{
+			Orient: "horizontal",
+			Top:    "top",
+			Right:  "0",
 			Selected: map[string]bool{
 				"kWh":      false,
 				"€":        true,
