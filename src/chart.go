@@ -30,7 +30,7 @@ func barChart() *charts.Bar {
 			Theme: types.ThemeWesteros,
 		}),
 		charts.WithTitleOpts(opts.Title{
-			Title:    "Wattpilot Consumption Stats",
+			Title:    "Wattpilot Chart",
 			Subtitle: "Stats calculated from Wattpilot data",
 		}),
 		charts.WithTooltipOpts(opts.Tooltip{
