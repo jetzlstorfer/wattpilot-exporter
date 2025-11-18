@@ -1,5 +1,5 @@
 # Use the official Golang image to create a build artifact.
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
@@ -14,7 +14,7 @@ RUN go mod download
 RUN go build -o /wattpilot-export 
 
 # Start a new stage from scratch
-FROM alpine:3.17  
+FROM alpine:3.19
 
 WORKDIR /
 
@@ -22,6 +22,9 @@ WORKDIR /
 COPY --from=builder /wattpilot-export .
 COPY --from=builder /app/template.html .
 COPY --from=builder /app/favicon.ico .
+
+# Update Alpine packages to ensure latest security patches
+RUN apk update && apk upgrade --no-cache
 
 EXPOSE 8080
 
