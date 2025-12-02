@@ -17,8 +17,10 @@ import (
 
 const OfficialPricePerKwh2024 = 0.33182
 const OfficialPricePerKwh2025 = 0.35889 // https://www.bmf.gv.at/themen/steuern/arbeitnehmerinnenveranlagung/pendlerfoerderung-das-pendlerpauschale/sachbezug-kraftfahrzeug.html
+const OfficialPricePerKwh2026 = 0.32806
 const PurchasePricePerKwh2024 = 0.2824
 const PurchasePricePerKwh2025 = 0.25
+const PurchasePricePerKwh2026 = 0.25
 const JSONFileName = "data.json"
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 
@@ -250,24 +252,30 @@ func RoundFloat(val float64, precision uint) float64 {
 
 func getSellingPriceOfYear(timestamp string) float64 {
 	year, _ := time.Parse("02.01.2006 15:04:05", timestamp)
-	if year.Year() == 2024 {
+	switch year.Year() {
+	case 2024:
 		return OfficialPricePerKwh2024
-	} else if year.Year() == 2025 {
+	case 2025:
 		return OfficialPricePerKwh2025
-	} else {
-		// set default to 2025 until we have no data for 2026
+	case 2026:
+		return OfficialPricePerKwh2026
+	default:
+		// set default to 2025 until we have no data for other years
 		return OfficialPricePerKwh2025
 	}
 }
 
 func getPurchasePriceOfYear(timestamp string) float64 {
 	year, _ := time.Parse("02.01.2006 15:04:05", timestamp)
-	if year.Year() == 2024 {
+	switch year.Year() {
+	case 2024:
 		return PurchasePricePerKwh2024
-	} else if year.Year() == 2025 {
+	case 2025:
 		return PurchasePricePerKwh2025
-	} else {
-		// set default to 2025 until we have no data for 2026
+	case 2026:
+		return PurchasePricePerKwh2026
+	default:
+		// set default to 2025 until we have no data for other years
 		return PurchasePricePerKwh2025
 	}
 }
