@@ -25,10 +25,12 @@ const JSONFileName = "data.json"
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 
 type WattpilotColumn struct {
-	Key  string `json:"key"`
-	Hide bool   `json:"hide,omitempty"`
-	Unit string `json:"unit,omitempty"`
-	Type string `json:"type,omitempty"`
+	Key       string `json:"key"`
+	Caption   string `json:"caption,omitempty"`
+	Hide      bool   `json:"hide,omitempty"`
+	HideInCsv bool   `json:"hideInCsv,omitempty"`
+	Unit      string `json:"unit,omitempty"`
+	Type      string `json:"type,omitempty"`
 }
 
 type WattpilotData struct {
