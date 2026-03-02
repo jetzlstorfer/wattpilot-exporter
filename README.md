@@ -13,7 +13,7 @@ Eg. `https://data.wattpilot.io/export?e=THIS_IS_YOUR_KEY`
 Run the application:
 ```bash
 cd src
-go run main.go
+go run .
 ```
 
 Alternatively, use the `makefile`:

@@ -10,6 +10,12 @@ import (
 	"github.com/joho/godotenv"
 )
 
+type SessionPoint struct {
+	EndTime string
+	Energy  float64
+	Price   float64
+}
+
 type Data struct {
 	Date             string
 	PrevMonth        string
@@ -20,6 +26,7 @@ type Data struct {
 	TotalEnergy      float64
 	TotalPrice       float64
 	TotalMargin      float64
+	Sessions         []SessionPoint
 }
 
 func calculateData(date string) (Data, error) {
@@ -37,12 +44,20 @@ func calculateData(date string) (Data, error) {
 	totalMargin := 0.0
 	latestSession := ""
 
+	var sessions []SessionPoint
+
 	// loop over the data
 	for _, data := range parsedData.Data {
 		totalEnergy += data.Energy
-		totalPrice += wattpilotutils.CalculatePrice(data.End, data.Energy, 100)
+		price := wattpilotutils.CalculatePrice(data.End, data.Energy, 100)
+		totalPrice += price
 		totalMargin += wattpilotutils.CalculatePriceMargin(data.End, data.Energy, data.Eco)
 		latestSession = data.End
+		sessions = append(sessions, SessionPoint{
+			EndTime: data.End,
+			Energy:  wattpilotutils.RoundFloat(data.Energy, 2),
+			Price:   wattpilotutils.RoundFloat(price, 2),
+		})
 	}
 	activeSession := false
 	loc, _ := time.LoadLocation("Europe/Berlin")
@@ -66,8 +81,21 @@ func calculateData(date string) (Data, error) {
 		IsCharging:       activeSession,
 		TotalEnergy:      totalEnergy,
 		TotalPrice:       totalPrice,
-		TotalMargin:      totalMargin}, nil
+		TotalMargin:      totalMargin,
+		Sessions:         sessions}, nil
 
+}
+
+func infoHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := template.ParseFiles("info.html")
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		log.Printf("infoHandler: template parse error: %v", err)
+		return
+	}
+	if err := tmpl.Execute(w, nil); err != nil {
+		log.Printf("infoHandler: template execute error: %v", err)
+	}
 }
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
@@ -78,8 +106,15 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpl := template.Must(template.ParseFiles("template.html"))
-	tmpl.Execute(w, data)
+	tmpl, err := template.ParseFiles("template.html")
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		log.Printf("mainHandler: template parse error: %v", err)
+		return
+	}
+	if err := tmpl.Execute(w, data); err != nil {
+		log.Printf("mainHandler: template execute error: %v", err)
+	}
 }
 
 func faviconHandler(w http.ResponseWriter, r *http.Request) {
@@ -101,10 +136,12 @@ func main() {
 		log.Println("Error loading .env file: " + err.Error())
 	}
 
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	http.HandleFunc("/", mainHandler)
 	http.HandleFunc("/favicon.ico", faviconHandler)
 	http.HandleFunc("/refresh", refreshHandler)
 	http.HandleFunc("/charts", chartHandler)
+	http.HandleFunc("/info", infoHandler)
 	log.Println("Starting server on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

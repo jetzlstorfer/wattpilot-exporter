@@ -3,34 +3,259 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+    <title>Wattpilot Dashboard</title>
+    <script src="/static/chart.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <title>Energy and Price Calculator</title>
+    <link rel="stylesheet" href="/static/tailwind.css">
+    <script>
+        (function () {
+            const stored = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (stored === 'dark' || (!stored && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .card { background: rgba(17,24,39,0.8); border: 1px solid rgba(255,255,255,0.07); backdrop-filter: blur(12px); }
+        .glow { box-shadow: 0 0 20px rgba(59,130,246,0.15); }
+        @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+        html:not(.dark) body { background: #f8fafc !important; color: #0f172a !important; }
+        html:not(.dark) nav { background: rgba(255,255,255,0.85) !important; border-color: rgba(15,23,42,0.08) !important; }
+        html:not(.dark) .card { background: rgba(255,255,255,0.9); border: 1px solid rgba(15,23,42,0.08); }
+        html:not(.dark) .text-white { color: #0f172a !important; }
+        html:not(.dark) .text-gray-100, html:not(.dark) .text-gray-200, html:not(.dark) .text-gray-300 { color: #1f2937 !important; }
+        html:not(.dark) .text-gray-400, html:not(.dark) .text-gray-500, html:not(.dark) .text-gray-600 { color: #4b5563 !important; }
+        html:not(.dark) .bg-white\/10 { background-color: rgba(15,23,42,0.08) !important; }
+        html:not(.dark) .hover\:bg-white\/5:hover { background-color: rgba(15,23,42,0.06) !important; }
+        html:not(.dark) .hover\:text-white:hover { color: #0f172a !important; }
+        html:not(.dark) .bg-emerald-950\/60 { background-color: rgba(209,250,229,0.7) !important; }
+        html:not(.dark) .border-white\/5, html:not(.dark) .border-white\/10 { border-color: rgba(15,23,42,0.08) !important; }
+        html:not(.dark) .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(15,23,42,0.08) !important; }
+    </style>
 </head>
-<body>
-    <h1>Wattpilot Energy and Price Calculator</h1>
-    <p>
-        {{ if .PrevMonth }}
-        ⬅️ <a href="?date={{ .PrevMonth }}">{{ .PrevMonth }}</a> | 
-        {{ end }} 
-        <strong>{{ .Date }}</strong> 
-        {{ if .NextMonth }}
-        | <a href="?date={{ .NextMonth }}">{{ .NextMonth }}</a> ➡️
-        {{ end }}
-    </p>
-    <p>⚡Total Energy: <strong>{{ printf "%.2f" .TotalEnergy}} kWh</strong> ({{ .ChargingSessions }} sessions)<br>
-    {{ if .IsCharging }}
-        <p><strong>⚡ Currently charging ⚡</strong></p>
-    {{ else }}
-        <small>Latest charging session: {{ .LatestSession }}</small>
-    {{ end }}
-    <p>💰 Total Price: <strong><span id="totalprice">{{printf "%.2f" .TotalPrice}}</span> €</strong></p>
-    <p>💰 Estimated margin: <strong><span id="estimatedmargin">{{printf "%.2f" .TotalMargin}}</span> €</strong></p>
+<body class="bg-gray-950 text-gray-100 min-h-screen antialiased">
 
-    <footer>
-        <a href="/refresh">Refresh</a> |
-        <a href="/info">Info</a> |
-        <a href="/charts">Charts</a>
+    <!-- Navigation -->
+    <nav class="sticky top-0 z-50 bg-gray-950/80 backdrop-blur-xl border-b border-white/5 px-6 py-4">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <a href="/" class="flex items-center gap-3 group">
+                <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-lg shadow-lg group-hover:bg-blue-500 transition-colors">⚡</div>
+                <span class="text-lg font-bold text-white tracking-tight">Wattpilot</span>
+            </a>
+            <div class="flex items-center gap-1">
+                <a href="/" class="px-4 py-2 rounded-xl text-sm font-medium bg-white/10 text-white">Dashboard</a>
+                <a href="/charts" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Charts</a>
+                <a href="/info" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Info</a>
+                <button id="themeToggle" type="button" class="px-3 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all" aria-label="Toggle theme">🌙</button>
+                <a href="/refresh" class="ml-2 px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-lg shadow-blue-900/30">↻ Refresh</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto px-6 py-10">
+
+        <!-- Page header + month navigation -->
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-10">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-1">Monthly Overview</p>
+                <h1 class="text-4xl font-extrabold text-white tracking-tight">{{ .Date }}</h1>
+            </div>
+            <div class="flex items-center gap-2">
+                {{ if .PrevMonth }}
+                <a href="?date={{ .PrevMonth }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium card hover:bg-gray-800 transition-all text-gray-300">
+                    ← {{ .PrevMonth }}
+                </a>
+                {{ end }}
+                {{ if .NextMonth }}
+                <a href="?date={{ .NextMonth }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium card hover:bg-gray-800 transition-all text-gray-300">
+                    {{ .NextMonth }} →
+                </a>
+                {{ end }}
+            </div>
+        </div>
+
+        <!-- Charging status banner -->
+        {{ if .IsCharging }}
+        <div class="mb-8 rounded-2xl bg-emerald-950/60 border border-emerald-500/30 px-6 py-4 flex items-center gap-4 glow">
+            <span class="pulse-dot inline-block w-3 h-3 rounded-full bg-emerald-400"></span>
+            <span class="text-emerald-300 font-semibold">Vehicle is currently charging</span>
+        </div>
+        {{ end }}
+
+        <!-- KPI cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="card rounded-2xl p-6 glow">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-2xl">⚡</span>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Energy</span>
+                </div>
+                <div class="text-3xl font-extrabold text-white">{{ printf "%.2f" .TotalEnergy }}</div>
+                <div class="text-sm text-gray-500 mt-1">kWh charged</div>
+            </div>
+            <div class="card rounded-2xl p-6">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-2xl">💶</span>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Cost</span>
+                </div>
+                <div class="text-3xl font-extrabold text-white">{{ printf "%.2f" .TotalPrice }}</div>
+                <div class="text-sm text-gray-500 mt-1">€ (official rate)</div>
+            </div>
+            <div class="card rounded-2xl p-6">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-2xl">📈</span>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Est. Savings</span>
+                </div>
+                <div class="text-3xl font-extrabold text-emerald-400">{{ printf "%.2f" .TotalMargin }}</div>
+                <div class="text-sm text-gray-500 mt-1">€ margin</div>
+            </div>
+            <div class="card rounded-2xl p-6">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-2xl">🔌</span>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Sessions</span>
+                </div>
+                <div class="text-3xl font-extrabold text-blue-400">{{ .ChargingSessions }}</div>
+                <div class="text-sm text-gray-500 mt-1">charging sessions</div>
+            </div>
+        </div>
+
+        <!-- Chart -->
+        {{ if .Sessions }}
+        <div class="card rounded-2xl p-6 mb-8">
+            <h2 class="text-lg font-bold text-white mb-1">Charging Sessions</h2>
+            <p class="text-sm text-gray-500 mb-6">Energy (kWh) and cost (€) per session</p>
+            <div class="relative" style="height:280px;">
+                <canvas id="sessionsChart"></canvas>
+            </div>
+        </div>
+        {{ end }}
+
+        <!-- Latest session footer -->
+        {{ if not .IsCharging }}
+        {{ if .LatestSession }}
+        <div class="card rounded-2xl px-6 py-4 flex items-center gap-3">
+            <span class="text-gray-500 text-sm">🕒 Latest session ended:</span>
+            <span class="text-gray-300 font-medium text-sm">{{ .LatestSession }}</span>
+        </div>
+        {{ end }}
+        {{ end }}
+
+    </main>
+
+    <footer class="max-w-6xl mx-auto px-6 pb-10 pt-4 flex items-center justify-between text-xs text-gray-600">
+        <span>Wattpilot Dashboard</span>
+        <div class="flex gap-4">
+            <a href="/refresh" class="hover:text-gray-400 transition-colors">Refresh data</a>
+            <a href="/charts" class="hover:text-gray-400 transition-colors">Full charts</a>
+            <a href="/info" class="hover:text-gray-400 transition-colors">About</a>
+        </div>
     </footer>
+
+    <script>
+    (function() {
+        const toggle = document.getElementById('themeToggle');
+        if (!toggle) return;
+        const setIcon = () => {
+            toggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+        };
+        setIcon();
+        toggle.addEventListener('click', function () {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            setIcon();
+        });
+    })();
+    </script>
+
+    {{ if .Sessions }}
+    <script>
+    (function(){
+        const isDark = document.documentElement.classList.contains('dark');
+        const tickColor = isDark ? '#6B7280' : '#4B5563';
+        const gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.10)';
+        const tooltipStyle = isDark
+            ? {
+                backgroundColor: 'rgba(17,24,39,0.95)',
+                borderColor: 'rgba(255,255,255,0.08)',
+                borderWidth: 1,
+                titleColor: '#F9FAFB',
+                bodyColor: '#D1D5DB',
+            }
+            : {
+                backgroundColor: 'rgba(255,255,255,0.98)',
+                borderColor: 'rgba(15,23,42,0.15)',
+                borderWidth: 1,
+                titleColor: '#0F172A',
+                bodyColor: '#334155',
+            };
+
+        const labels = [{{ range .Sessions }}"{{ .EndTime }}",{{ end }}];
+        const energyData = [{{ range .Sessions }}{{ .Energy }},{{ end }}];
+        const priceData = [{{ range .Sessions }}{{ .Price }},{{ end }}];
+
+        const ctx = document.getElementById('sessionsChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Energy (kWh)',
+                        data: energyData,
+                        backgroundColor: 'rgba(59,130,246,0.7)',
+                        borderColor: 'rgba(59,130,246,1)',
+                        borderWidth: 0,
+                        borderRadius: 5,
+                        yAxisID: 'y',
+                    },
+                    {
+                        label: 'Cost (€)',
+                        data: priceData,
+                        backgroundColor: 'rgba(16,185,129,0.7)',
+                        borderColor: 'rgba(16,185,129,1)',
+                        borderWidth: 0,
+                        borderRadius: 5,
+                        yAxisID: 'y1',
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { labels: { color: tickColor, font: { family: 'Inter' } } },
+                    tooltip: tooltipStyle
+                },
+                scales: {
+                    x: {
+                        ticks: { color: tickColor, maxRotation: 45, font: { size: 11 } },
+                        grid: { color: gridColor }
+                    },
+                    y: {
+                        type: 'linear',
+                        position: 'left',
+                        ticks: { color: tickColor },
+                        grid: { color: gridColor },
+                        title: { display: true, text: 'kWh', color: tickColor }
+                    },
+                    y1: {
+                        type: 'linear',
+                        position: 'right',
+                        ticks: { color: tickColor },
+                        grid: { drawOnChartArea: false },
+                        title: { display: true, text: '€', color: tickColor }
+                    }
+                }
+            }
+        });
+    })();
+    </script>
+    {{ end }}
 </body>
 </html>

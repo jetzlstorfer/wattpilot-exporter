@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About – Wattpilot Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="/static/tailwind.css">
+    <script>
+        (function () {
+            const stored = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (stored === 'dark' || (!stored && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .card { background: rgba(17,24,39,0.8); border: 1px solid rgba(255,255,255,0.07); backdrop-filter: blur(12px); }
+        html:not(.dark) body { background: #f8fafc !important; color: #0f172a !important; }
+        html:not(.dark) nav { background: rgba(255,255,255,0.85) !important; border-color: rgba(15,23,42,0.08) !important; }
+        html:not(.dark) .card { background: rgba(255,255,255,0.9); border: 1px solid rgba(15,23,42,0.08); }
+        html:not(.dark) .text-white { color: #0f172a !important; }
+        html:not(.dark) .text-gray-100, html:not(.dark) .text-gray-200, html:not(.dark) .text-gray-300 { color: #1f2937 !important; }
+        html:not(.dark) .text-gray-400, html:not(.dark) .text-gray-500, html:not(.dark) .text-gray-600 { color: #4b5563 !important; }
+        html:not(.dark) .bg-white\/10 { background-color: rgba(15,23,42,0.08) !important; }
+        html:not(.dark) .hover\:bg-white\/5:hover { background-color: rgba(15,23,42,0.06) !important; }
+        html:not(.dark) .hover\:text-white:hover { color: #0f172a !important; }
+        html:not(.dark) .border-white\/5, html:not(.dark) .border-white\/10 { border-color: rgba(15,23,42,0.08) !important; }
+        html:not(.dark) .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(15,23,42,0.08) !important; }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen antialiased">
+
+    <!-- Navigation -->
+    <nav class="sticky top-0 z-50 bg-gray-950/80 backdrop-blur-xl border-b border-white/5 px-6 py-4">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <a href="/" class="flex items-center gap-3 group">
+                <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-lg shadow-lg group-hover:bg-blue-500 transition-colors">⚡</div>
+                <span class="text-lg font-bold text-white tracking-tight">Wattpilot</span>
+            </a>
+            <div class="flex items-center gap-1">
+                <a href="/" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Dashboard</a>
+                <a href="/charts" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Charts</a>
+                <a href="/info" class="px-4 py-2 rounded-xl text-sm font-medium bg-white/10 text-white">Info</a>
+                <button id="themeToggle" type="button" class="px-3 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all" aria-label="Toggle theme">🌙</button>
+                <a href="/refresh" class="ml-2 px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-lg shadow-blue-900/30">↻ Refresh</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-3xl mx-auto px-6 py-16">
+
+        <!-- Hero -->
+        <div class="text-center mb-16">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-blue-600/20 border border-blue-500/30 rounded-3xl text-4xl mb-6">⚡</div>
+            <h1 class="text-5xl font-extrabold text-white tracking-tight mb-4">Wattpilot Exporter</h1>
+            <p class="text-xl text-gray-400 leading-relaxed max-w-xl mx-auto">
+                A personal dashboard for tracking your EV charging costs, energy consumption, and savings.
+            </p>
+        </div>
+
+        <!-- What it does -->
+        <div class="card rounded-2xl p-8 mb-6">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-3">
+                <span class="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center text-base">📡</span>
+                What it does
+            </h2>
+            <p class="text-gray-400 leading-relaxed mb-4">
+                <strong class="text-gray-200">Wattpilot Exporter</strong> fetches your EV charging session data from the
+                <a href="https://wattpilot.io" target="_blank" class="text-blue-400 hover:text-blue-300 underline underline-offset-2">Wattpilot cloud API</a>
+                and turns it into a clean, easy-to-read dashboard.
+            </p>
+            <p class="text-gray-400 leading-relaxed">
+                It calculates how much energy you consumed each month, the official tax-relevant cost based on Austrian government rates, and your estimated savings when charging from your own solar energy.
+            </p>
+        </div>
+
+        <!-- Features grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <div class="card rounded-2xl p-6">
+                <div class="text-2xl mb-3">📊</div>
+                <h3 class="font-semibold text-white mb-2">Monthly Stats</h3>
+                <p class="text-sm text-gray-400 leading-relaxed">Browse energy and cost data month by month, with intuitive navigation.</p>
+            </div>
+            <div class="card rounded-2xl p-6">
+                <div class="text-2xl mb-3">📈</div>
+                <h3 class="font-semibold text-white mb-2">Session Charts</h3>
+                <p class="text-sm text-gray-400 leading-relaxed">Visualise per-session and historical charging data with interactive bar charts.</p>
+            </div>
+            <div class="card rounded-2xl p-6">
+                <div class="text-2xl mb-3">💶</div>
+                <h3 class="font-semibold text-white mb-2">Cost Calculation</h3>
+                <p class="text-sm text-gray-400 leading-relaxed">Uses the official Austrian government kWh rates to compute the exact tax-relevant car benefit (Sachbezug).</p>
+            </div>
+            <div class="card rounded-2xl p-6">
+                <div class="text-2xl mb-3">☀️</div>
+                <h3 class="font-semibold text-white mb-2">Solar Savings</h3>
+                <p class="text-sm text-gray-400 leading-relaxed">Tracks estimated savings (margin) when sessions are charged with eco / solar energy.</p>
+            </div>
+        </div>
+
+        <!-- Price rates -->
+        <div class="card rounded-2xl p-8 mb-6">
+            <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center text-base">💹</span>
+                Official Price Rates
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-white/10">
+                            <th class="text-left text-gray-500 font-medium pb-3">Year</th>
+                            <th class="text-right text-gray-500 font-medium pb-3">Official rate (€/kWh)</th>
+                            <th class="text-right text-gray-500 font-medium pb-3">Purchase price (€/kWh)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/5">
+                        <tr>
+                            <td class="py-3 text-gray-300 font-medium">2024</td>
+                            <td class="py-3 text-right text-gray-400">0.33182</td>
+                            <td class="py-3 text-right text-gray-400">0.2824</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 text-gray-300 font-medium">2025</td>
+                            <td class="py-3 text-right text-gray-400">0.35889</td>
+                            <td class="py-3 text-right text-gray-400">0.2500</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 text-gray-300 font-medium">2026</td>
+                            <td class="py-3 text-right text-gray-400">0.32806</td>
+                            <td class="py-3 text-right text-gray-400">0.2500</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-xs text-gray-600 mt-4">
+                Source: <a href="https://www.bmf.gv.at/themen/steuern/arbeitnehmerinnenveranlagung/pendlerfoerderung-das-pendlerpauschale/sachbezug-kraftfahrzeug.html" target="_blank" class="hover:text-gray-400 underline underline-offset-2">bmf.gv.at – Sachbezug Kraftfahrzeug</a>
+            </p>
+        </div>
+
+        <!-- How to run -->
+        <div class="card rounded-2xl p-8 mb-6">
+            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-3">
+                <span class="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center text-base">🚀</span>
+                Running the app
+            </h2>
+            <p class="text-gray-400 text-sm leading-relaxed mb-4">Set the <code class="bg-white/10 px-1.5 py-0.5 rounded text-blue-300 font-mono text-xs">WATTPILOT_KEY</code> environment variable — you can find it in your Wattpilot export URL as the <code class="bg-white/10 px-1.5 py-0.5 rounded text-blue-300 font-mono text-xs">?e=</code> parameter.</p>
+            <pre class="bg-gray-900 border border-white/10 rounded-xl p-4 text-xs font-mono text-green-400 overflow-x-auto">cd src
+go run .</pre>
+            <p class="text-gray-500 text-xs mt-3">Open <span class="text-gray-300">http://localhost:8080</span> in your browser.</p>
+        </div>
+
+    </main>
+
+    <footer class="max-w-6xl mx-auto px-6 pb-10 pt-4 flex items-center justify-between text-xs text-gray-600">
+        <span>Wattpilot Dashboard</span>
+        <div class="flex gap-4">
+            <a href="/" class="hover:text-gray-400 transition-colors">Dashboard</a>
+            <a href="/charts" class="hover:text-gray-400 transition-colors">Charts</a>
+        </div>
+    </footer>
+
+    <script>
+    (function() {
+        const toggle = document.getElementById('themeToggle');
+        if (!toggle) return;
+        const setIcon = () => {
+            toggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+        };
+        setIcon();
+        toggle.addEventListener('click', function () {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            setIcon();
+        });
+    })();
+    </script>
+
+</body>
+</html>

@@ -1,59 +1,26 @@
 package main
 
 import (
+	"html/template"
+	"log"
 	"net/http"
 
 	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
-
-	"github.com/go-echarts/go-echarts/v2/charts"
-	"github.com/go-echarts/go-echarts/v2/components"
-	"github.com/go-echarts/go-echarts/v2/opts"
-	"github.com/go-echarts/go-echarts/v2/types"
 )
 
-// generate random data for bar chart
-func generateBarItems(data []float64) []opts.BarData {
-	items := make([]opts.BarData, 0)
-	for i := 0; i < len(data); i++ {
-		items = append(items, opts.BarData{Value: data[i]})
-	}
-	return items
+type MonthStat struct {
+	Month    string
+	Sessions int
+	Energy   float64
+	Price    float64
+	Margin   float64
 }
 
-func barChart() *charts.Bar {
-	// create a new bar instance
-	bar := charts.NewBar()
+type ChartsData struct {
+	Months []MonthStat
+}
 
-	// set some global options like Title/Legend/ToolTip or anything else
-	bar.SetGlobalOptions(
-		charts.WithInitializationOpts(opts.Initialization{
-			Theme: types.ThemeWesteros,
-		}),
-		charts.WithTitleOpts(opts.Title{
-			Title:    "Wattpilot Chart",
-			Subtitle: "Stats calculated from Wattpilot data",
-		}),
-		charts.WithTooltipOpts(opts.Tooltip{
-			Show:      opts.Bool(true),
-			Trigger:   "item",
-			Formatter: "{c} {a}",
-		}),
-		charts.WithDataZoomOpts(opts.DataZoom{
-			Type:  "slider",
-			Start: 0,
-			End:   100,
-		}),
-		charts.WithLegendOpts(opts.Legend{
-			Orient: "horizontal",
-			Top:    "top",
-			Right:  "0",
-			Selected: map[string]bool{
-				"kWh":      false,
-				"€":        true,
-				"€ Margin": true,
-			}}),
-	)
-
+func chartHandler(w http.ResponseWriter, _ *http.Request) {
 	// generate all months since June 2024
 	firstMonthWithData := "2024-06"
 	months := []string{firstMonthWithData}
@@ -63,38 +30,33 @@ func barChart() *charts.Bar {
 
 	// get data from wattpilot
 	data := wattpilotutils.GetStatsForMonths(months)
-	kwhData := make([]float64, 0)
-	euroData := make([]float64, 0)
-	marginData := make([]float64, 0)
+	var monthStats []MonthStat
 
-	for _, monthData := range data {
-		//fmt.Println(month.Data)
+	for i, monthData := range data {
 		totalEnergy := 0.0
 		totalEuro := 0.0
 		totalMargin := 0.0
-		for _, month := range monthData.Data {
-			totalEnergy += month.Energy
-			totalEuro += wattpilotutils.CalculatePrice(month.End, month.Energy, 100)
-			totalMargin += wattpilotutils.CalculatePriceMargin(month.End, month.Energy, month.Eco)
+		for _, session := range monthData.Data {
+			totalEnergy += session.Energy
+			totalEuro += wattpilotutils.CalculatePrice(session.End, session.Energy, 100)
+			totalMargin += wattpilotutils.CalculatePriceMargin(session.End, session.Energy, session.Eco)
 		}
-
-		kwhData = append(kwhData, wattpilotutils.RoundFloat(totalEnergy, 2))
-		euroData = append(euroData, wattpilotutils.RoundFloat(totalEuro, 2))
-		marginData = append(marginData, wattpilotutils.RoundFloat(totalMargin, 2))
+		monthStats = append(monthStats, MonthStat{
+			Month:    months[i],
+			Sessions: len(monthData.Data),
+			Energy:   wattpilotutils.RoundFloat(totalEnergy, 2),
+			Price:    wattpilotutils.RoundFloat(totalEuro, 2),
+			Margin:   wattpilotutils.RoundFloat(totalMargin, 2),
+		})
 	}
-	// Put data into instance
-	bar.SetXAxis(months).
-		AddSeries("kWh", generateBarItems(kwhData)).
-		AddSeries("€", generateBarItems(euroData)).
-		AddSeries("€ Margin", generateBarItems(marginData))
-	return bar
-}
 
-func chartHandler(w http.ResponseWriter, _ *http.Request) {
-	page := components.NewPage()
-
-	page.AddCharts(barChart())
-	//page.AddCharts(liquidArrow())
-
-	page.Render(w)
+	tmpl, err := template.ParseFiles("charts.html")
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		log.Printf("chartHandler: template parse error: %v", err)
+		return
+	}
+	if err := tmpl.Execute(w, ChartsData{Months: monthStats}); err != nil {
+		log.Printf("chartHandler: template execute error: %v", err)
+	}
 }
