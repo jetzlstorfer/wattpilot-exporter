@@ -1,0 +1,26 @@
+{
+  "name": "wattpilot-exporter",
+  "image": "mcr.microsoft.com/devcontainers/go:1",
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": {
+      "label": "wattpilot-exporter",
+      "onAutoForward": "notify"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go"
+      ],
+      "settings": {
+        "go.toolsManagement.checkForUpdates": "local",
+        "go.useLanguageServer": true
+      }
+    }
+  },
+  "postCreateCommand": "cd src && go mod download",
+  "remoteEnv": {
+    "WATTPILOT_KEY": "${localEnv:WATTPILOT_KEY}"
+  }
+}
