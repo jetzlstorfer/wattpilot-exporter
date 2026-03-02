@@ -14,7 +14,7 @@ RUN go mod download
 RUN go build -o /wattpilot-export 
 
 # Start a new stage from scratch
-FROM alpine:3.19
+FROM alpine:3.23
 
 WORKDIR /
 
