@@ -250,6 +250,22 @@ func RoundFloat(val float64, precision uint) float64 {
 	return math.Round(val*ratio) / ratio
 }
 
+// GetOfficialPricePerKwhForMonth returns the fixed official price per kWh for
+// the given year-month string (format "2006-01").
+func GetOfficialPricePerKwhForMonth(yearMonth string) float64 {
+	t, _ := time.Parse("2006-01", yearMonth)
+	switch t.Year() {
+	case 2024:
+		return OfficialPricePerKwh2024
+	case 2025:
+		return OfficialPricePerKwh2025
+	case 2026:
+		return OfficialPricePerKwh2026
+	default:
+		return OfficialPricePerKwh2025
+	}
+}
+
 func getSellingPriceOfYear(timestamp string) float64 {
 	year, _ := time.Parse("02.01.2006 15:04:05", timestamp)
 	switch year.Year() {

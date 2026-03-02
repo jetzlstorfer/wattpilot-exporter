@@ -58,10 +58,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	totalEnergy := wattpilotutils.RoundFloat(data.TotalEnergy, 2)
 	totalPrice := wattpilotutils.RoundFloat(data.TotalPrice, 2)
 
-	var pricePerKwh float64
-	if data.TotalEnergy > 0 {
-		pricePerKwh = data.TotalPrice / data.TotalEnergy
-	}
+	pricePerKwh := wattpilotutils.GetOfficialPricePerKwhForMonth(data.Date)
 
 	summaryRows := [][]interface{}{
 		{"Total kWh", totalEnergy, "kWh"},
