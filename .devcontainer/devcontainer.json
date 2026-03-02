@@ -19,6 +19,11 @@
       }
     }
   },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "moby": false
+    }
+  },
   "postCreateCommand": "cd src && go mod download",
   "remoteEnv": {
     "WATTPILOT_KEY": "${localEnv:WATTPILOT_KEY}"
