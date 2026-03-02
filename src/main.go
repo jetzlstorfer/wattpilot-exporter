@@ -87,8 +87,15 @@ func calculateData(date string) (Data, error) {
 }
 
 func infoHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.ParseFiles("info.html"))
-	tmpl.Execute(w, nil)
+	tmpl, err := template.ParseFiles("info.html")
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		log.Printf("infoHandler: template parse error: %v", err)
+		return
+	}
+	if err := tmpl.Execute(w, nil); err != nil {
+		log.Printf("infoHandler: template execute error: %v", err)
+	}
 }
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
@@ -99,8 +106,15 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpl := template.Must(template.ParseFiles("template.html"))
-	tmpl.Execute(w, data)
+	tmpl, err := template.ParseFiles("template.html")
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		log.Printf("mainHandler: template parse error: %v", err)
+		return
+	}
+	if err := tmpl.Execute(w, data); err != nil {
+		log.Printf("mainHandler: template execute error: %v", err)
+	}
 }
 
 func faviconHandler(w http.ResponseWriter, r *http.Request) {
