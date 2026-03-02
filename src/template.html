@@ -185,21 +185,7 @@
         </div>
     </footer>
 
-    <script>
-    (function() {
-        const toggle = document.getElementById('themeToggle');
-        if (!toggle) return;
-        const setIcon = () => {
-            toggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
-        };
-        setIcon();
-        toggle.addEventListener('click', function () {
-            const isDark = document.documentElement.classList.toggle('dark');
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
-            setIcon();
-        });
-    })();
-    </script>
+    <script src="/static/theme.js"></script>
 
     {{ if .Sessions }}
     <script>

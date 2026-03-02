@@ -144,21 +144,9 @@
         </div>
     </footer>
 
+    <script src="/static/theme.js"></script>
     <script>
     (function(){
-        const toggle = document.getElementById('themeToggle');
-        if (toggle) {
-            const setIcon = () => {
-                toggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
-            };
-            setIcon();
-            toggle.addEventListener('click', function () {
-                const isDark = document.documentElement.classList.toggle('dark');
-                localStorage.setItem('theme', isDark ? 'dark' : 'light');
-                setIcon();
-            });
-        }
-
         const months  = [{{ range .Months }}"{{ .Month }}",{{ end }}];
         const kwh     = [{{ range .Months }}{{ .Energy }},{{ end }}];
         const euro    = [{{ range .Months }}{{ .Price }},{{ end }}];
