@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,12 +10,33 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" href="/static/tailwind.css">
+    <script>
+        (function () {
+            const stored = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (stored === 'dark' || (!stored && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .card { background: rgba(17,24,39,0.8); border: 1px solid rgba(255,255,255,0.07); backdrop-filter: blur(12px); }
         .glow { box-shadow: 0 0 20px rgba(59,130,246,0.15); }
         @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
         .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+        html:not(.dark) body { background: #f8fafc !important; color: #0f172a !important; }
+        html:not(.dark) nav { background: rgba(255,255,255,0.85) !important; border-color: rgba(15,23,42,0.08) !important; }
+        html:not(.dark) .card { background: rgba(255,255,255,0.9); border: 1px solid rgba(15,23,42,0.08); }
+        html:not(.dark) .text-white { color: #0f172a !important; }
+        html:not(.dark) .text-gray-100, html:not(.dark) .text-gray-200, html:not(.dark) .text-gray-300 { color: #1f2937 !important; }
+        html:not(.dark) .text-gray-400, html:not(.dark) .text-gray-500, html:not(.dark) .text-gray-600 { color: #4b5563 !important; }
+        html:not(.dark) .bg-white\/10 { background-color: rgba(15,23,42,0.08) !important; }
+        html:not(.dark) .hover\:bg-white\/5:hover { background-color: rgba(15,23,42,0.06) !important; }
+        html:not(.dark) .hover\:text-white:hover { color: #0f172a !important; }
+        html:not(.dark) .bg-emerald-950\/60 { background-color: rgba(209,250,229,0.7) !important; }
+        html:not(.dark) .border-white\/5, html:not(.dark) .border-white\/10 { border-color: rgba(15,23,42,0.08) !important; }
+        html:not(.dark) .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(15,23,42,0.08) !important; }
     </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen antialiased">
@@ -31,6 +52,7 @@
                 <a href="/" class="px-4 py-2 rounded-xl text-sm font-medium bg-white/10 text-white">Dashboard</a>
                 <a href="/charts" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Charts</a>
                 <a href="/info" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Info</a>
+                <button id="themeToggle" type="button" class="px-3 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all" aria-label="Toggle theme">🌙</button>
                 <a href="/refresh" class="ml-2 px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-lg shadow-blue-900/30">↻ Refresh</a>
             </div>
         </div>
@@ -134,9 +156,44 @@
         </div>
     </footer>
 
+    <script>
+    (function() {
+        const toggle = document.getElementById('themeToggle');
+        if (!toggle) return;
+        const setIcon = () => {
+            toggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+        };
+        setIcon();
+        toggle.addEventListener('click', function () {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            setIcon();
+        });
+    })();
+    </script>
+
     {{ if .Sessions }}
     <script>
     (function(){
+        const isDark = document.documentElement.classList.contains('dark');
+        const tickColor = isDark ? '#6B7280' : '#4B5563';
+        const gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.10)';
+        const tooltipStyle = isDark
+            ? {
+                backgroundColor: 'rgba(17,24,39,0.95)',
+                borderColor: 'rgba(255,255,255,0.08)',
+                borderWidth: 1,
+                titleColor: '#F9FAFB',
+                bodyColor: '#D1D5DB',
+            }
+            : {
+                backgroundColor: 'rgba(255,255,255,0.98)',
+                borderColor: 'rgba(15,23,42,0.15)',
+                borderWidth: 1,
+                titleColor: '#0F172A',
+                bodyColor: '#334155',
+            };
+
         const labels = [{{ range .Sessions }}"{{ .EndTime }}",{{ end }}];
         const energyData = [{{ range .Sessions }}{{ .Energy }},{{ end }}];
         const priceData = [{{ range .Sessions }}{{ .Price }},{{ end }}];
@@ -172,33 +229,27 @@
                 maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
-                    legend: { labels: { color: '#9CA3AF', font: { family: 'Inter' } } },
-                    tooltip: {
-                        backgroundColor: 'rgba(17,24,39,0.95)',
-                        borderColor: 'rgba(255,255,255,0.08)',
-                        borderWidth: 1,
-                        titleColor: '#F9FAFB',
-                        bodyColor: '#D1D5DB',
-                    }
+                    legend: { labels: { color: tickColor, font: { family: 'Inter' } } },
+                    tooltip: tooltipStyle
                 },
                 scales: {
                     x: {
-                        ticks: { color: '#6B7280', maxRotation: 45, font: { size: 11 } },
-                        grid: { color: 'rgba(255,255,255,0.04)' }
+                        ticks: { color: tickColor, maxRotation: 45, font: { size: 11 } },
+                        grid: { color: gridColor }
                     },
                     y: {
                         type: 'linear',
                         position: 'left',
-                        ticks: { color: '#6B7280' },
-                        grid: { color: 'rgba(255,255,255,0.04)' },
-                        title: { display: true, text: 'kWh', color: '#6B7280' }
+                        ticks: { color: tickColor },
+                        grid: { color: gridColor },
+                        title: { display: true, text: 'kWh', color: tickColor }
                     },
                     y1: {
                         type: 'linear',
                         position: 'right',
-                        ticks: { color: '#6B7280' },
+                        ticks: { color: tickColor },
                         grid: { drawOnChartArea: false },
-                        title: { display: true, text: '€', color: '#6B7280' }
+                        title: { display: true, text: '€', color: tickColor }
                     }
                 }
             }
