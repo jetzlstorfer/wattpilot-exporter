@@ -25,10 +25,12 @@ const JSONFileName = "data.json"
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 
 type WattpilotColumn struct {
-	Key  string `json:"key"`
-	Hide bool   `json:"hide,omitempty"`
-	Unit string `json:"unit,omitempty"`
-	Type string `json:"type,omitempty"`
+	Key       string `json:"key"`
+	Caption   string `json:"caption,omitempty"`
+	Hide      bool   `json:"hide,omitempty"`
+	HideInCsv bool   `json:"hideInCsv,omitempty"`
+	Unit      string `json:"unit,omitempty"`
+	Type      string `json:"type,omitempty"`
 }
 
 type WattpilotData struct {
@@ -248,6 +250,22 @@ func GetStatsForMonths(months []string) []WattpilotData {
 func RoundFloat(val float64, precision uint) float64 {
 	ratio := math.Pow(10, float64(precision))
 	return math.Round(val*ratio) / ratio
+}
+
+// GetOfficialPricePerKwhForMonth returns the fixed official price per kWh for
+// the given year-month string (format "2006-01").
+func GetOfficialPricePerKwhForMonth(yearMonth string) float64 {
+	t, _ := time.Parse("2006-01", yearMonth)
+	switch t.Year() {
+	case 2024:
+		return OfficialPricePerKwh2024
+	case 2025:
+		return OfficialPricePerKwh2025
+	case 2026:
+		return OfficialPricePerKwh2026
+	default:
+		return OfficialPricePerKwh2025
+	}
 }
 
 func getSellingPriceOfYear(timestamp string) float64 {
