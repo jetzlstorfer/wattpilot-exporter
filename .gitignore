@@ -30,3 +30,5 @@ src/wattpilot-exporter
 # data
 src/data.json
 src/data*_backup.json
+src/*ladeabrechnung.xlsx
+
