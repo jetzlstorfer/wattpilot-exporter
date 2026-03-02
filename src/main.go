@@ -142,6 +142,7 @@ func main() {
 	http.HandleFunc("/refresh", refreshHandler)
 	http.HandleFunc("/charts", chartHandler)
 	http.HandleFunc("/info", infoHandler)
+	http.HandleFunc("/download", downloadHandler)
 	log.Println("Starting server on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
