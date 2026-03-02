@@ -130,7 +130,9 @@ func refreshHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 
 	// get env variables from .env file
-	err := godotenv.Load()
+	// Using Overload() instead of Load() to ensure .env always takes precedence
+	// over any pre-existing environment variables (e.g. empty WATTPILOT_KEY in shell)
+	err := godotenv.Overload()
 	if err != nil {
 		//log.Fatal("Error loading .env file")
 		log.Println("Error loading .env file: " + err.Error())
