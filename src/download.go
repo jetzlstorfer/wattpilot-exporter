@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
+	"github.com/jetzlstorfer/wattpilot-exporter/telemetry"
 	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
 	"github.com/xuri/excelize/v2"
 )
@@ -94,7 +94,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	for i, col := range columns {
 		if err := setCellOrError(i+1, 1, col.Caption); err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			log.Printf("downloadHandler: header cell error: %v", err)
+			telemetry.Errorf("downloadHandler: header cell error: %v", err)
 			return
 		}
 	}
@@ -114,7 +114,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 			val := getEntryValue(col.Key, entry)
 			if err := setCellOrError(j+1, row, val); err != nil {
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-				log.Printf("downloadHandler: data cell error: %v", err)
+				telemetry.Errorf("downloadHandler: data cell error: %v", err)
 				return
 			}
 		}
@@ -151,7 +151,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			if err := setCellOrError(col+1, summaryRow+i, val); err != nil {
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-				log.Printf("downloadHandler: summary cell error: %v", err)
+				telemetry.Errorf("downloadHandler: summary cell error: %v", err)
 				return
 			}
 		}
@@ -159,7 +159,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Set the energy SUM formula in the Total kWh row
 	if err := f.SetCellFormula(sheet, energySumCell, energySumFormula); err != nil {
-		log.Printf("downloadHandler: formula error: %v", err)
+		telemetry.Errorf("downloadHandler: formula error: %v", err)
 	}
 
 	filename := fmt.Sprintf("%s ladeabrechnung.xlsx", monthToCalculate)
@@ -167,6 +167,6 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
 	if err := f.Write(w); err != nil {
-		log.Printf("downloadHandler: failed to write xlsx: %v", err)
+		telemetry.Errorf("downloadHandler: failed to write xlsx: %v", err)
 	}
 }

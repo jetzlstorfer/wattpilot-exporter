@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"html/template"
-	"log"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/jetzlstorfer/wattpilot-exporter/telemetry"
 	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
 	"github.com/joho/godotenv"
 )
@@ -90,11 +93,11 @@ func infoHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.ParseFiles("info.html")
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		log.Printf("infoHandler: template parse error: %v", err)
+		telemetry.Errorf("infoHandler: template parse error: %v", err)
 		return
 	}
 	if err := tmpl.Execute(w, nil); err != nil {
-		log.Printf("infoHandler: template execute error: %v", err)
+		telemetry.Errorf("infoHandler: template execute error: %v", err)
 	}
 }
 
@@ -109,11 +112,11 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.ParseFiles("template.html")
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		log.Printf("mainHandler: template parse error: %v", err)
+		telemetry.Errorf("mainHandler: template parse error: %v", err)
 		return
 	}
 	if err := tmpl.Execute(w, data); err != nil {
-		log.Printf("mainHandler: template execute error: %v", err)
+		telemetry.Errorf("mainHandler: template execute error: %v", err)
 	}
 }
 
@@ -128,6 +131,12 @@ func refreshHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	ctx := context.Background()
+	if err := telemetry.Init(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to initialize telemetry logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer telemetry.Shutdown(ctx)
 
 	// get env variables from .env file
 	// Using Overload() instead of Load() to ensure .env always takes precedence
@@ -135,7 +144,7 @@ func main() {
 	err := godotenv.Overload()
 	if err != nil {
 		//log.Fatal("Error loading .env file")
-		log.Println("Error loading .env file: " + err.Error())
+		telemetry.Errorf("Error loading .env file: %v", err)
 	}
 
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
@@ -145,6 +154,8 @@ func main() {
 	http.HandleFunc("/charts", chartHandler)
 	http.HandleFunc("/info", infoHandler)
 	http.HandleFunc("/download", downloadHandler)
-	log.Println("Starting server on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	telemetry.Infof("Starting server on :8080")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		telemetry.Fatalf("server failed: %v", err)
+	}
 }

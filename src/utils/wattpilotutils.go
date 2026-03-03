@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"net/http"
 	"net/url"
@@ -13,6 +12,8 @@ import (
 	"strings"
 	"time"
 	_ "time/tzdata"
+
+	"github.com/jetzlstorfer/wattpilot-exporter/telemetry"
 )
 
 const OfficialPricePerKwh2024 = 0.33182
@@ -88,23 +89,23 @@ func GetJSONData() ([]byte, error) {
 	// Read JSON document from file.
 	jsonData, err := readJSONFile(JSONFileName)
 	if err != nil {
-		log.Printf("Failed to read JSON file: %v", err)
+		telemetry.Errorf("Failed to read JSON file: %v", err)
 	}
 
 	// If JSON file not found, fetch data from the web and store in file.
 	if jsonData == nil {
-		log.Println("JSON file not found, fetching data from the web")
+		telemetry.Info("JSON file not found, fetching data from the web")
 		key := os.Getenv("WATTPILOT_KEY")
 		myUrl := PrepUrl(WattpilotDataUrl, "", "", key)
 
 		// Fetch JSON document from the web.
 		jsonData, err = FetchJSON(myUrl) // Remove the redeclaration of jsonData
 		if err != nil || jsonData == nil {
-			log.Fatalf("Failed to fetch JSON: %v", err)
+			telemetry.Fatalf("Failed to fetch JSON: %v", err)
 		}
 		err = saveJSONFile(JSONFileName, jsonData)
 		if err != nil {
-			log.Fatalf("Failed to save JSON file: %v", err)
+			telemetry.Fatalf("Failed to save JSON file: %v", err)
 		}
 	}
 
@@ -142,7 +143,7 @@ func saveJSONFile(filename string, jsonData []byte) error {
 func PrepUrl(wattpilotDataUrl string, from string, to string, key string) string {
 	myUrl, err := url.Parse(wattpilotDataUrl)
 	if err != nil {
-		log.Fatal(err)
+		telemetry.Fatalf("failed to parse wattpilot url: %v", err)
 	}
 	values := myUrl.Query()
 	if from == "" || to == "" {
@@ -161,7 +162,7 @@ func GetUnixTimestampStart(yearMonth string) string {
 	// year-month into unix timestamp
 	loc, err := time.LoadLocation("Europe/Berlin")
 	if err != nil {
-		log.Fatal(err)
+		telemetry.Fatalf("failed to load timezone: %v", err)
 	}
 	t, _ := time.Parse("2006-01", yearMonth)
 	return strconv.FormatInt(t.In(loc).Unix()*1000, 10)
@@ -170,7 +171,7 @@ func GetUnixTimestampEnd(yearMonth string) string {
 	// year-month into unix timestamp
 	loc, err := time.LoadLocation("Europe/Berlin")
 	if err != nil {
-		log.Fatal(err)
+		telemetry.Fatalf("failed to load timezone: %v", err)
 	}
 	t, _ := time.Parse("2006-01", yearMonth)
 
@@ -211,13 +212,13 @@ func GetStatsForMonth(monthToCalculate string) WattpilotData {
 	// Fetch JSON document from the web
 	jsonData, err := GetJSONData()
 	if err != nil {
-		log.Fatalf("Failed to fetch JSON: %v", err)
+		telemetry.Fatalf("Failed to fetch JSON: %v", err)
 	}
 
 	// Parse JSON document
 	parsedData, err := ParseJSON(jsonData)
 	if err != nil {
-		log.Fatalf("Failed to parse JSON: %v", err)
+		telemetry.Fatalf("Failed to parse JSON: %v", err)
 	}
 
 	// now convert the data to the correct format
@@ -317,12 +318,12 @@ func RefreshData() {
 	// Fetch JSON document from the web
 	jsonData, err := FetchJSON(myUrl)
 	if err != nil {
-		log.Fatalf("Failed to fetch JSON: %v", err)
+		telemetry.Fatalf("Failed to fetch JSON: %v", err)
 	}
 
 	// Save JSON document to file
 	err = saveJSONFile(JSONFileName, jsonData)
 	if err != nil {
-		log.Fatalf("Failed to save JSON file: %v", err)
+		telemetry.Fatalf("Failed to save JSON file: %v", err)
 	}
 }

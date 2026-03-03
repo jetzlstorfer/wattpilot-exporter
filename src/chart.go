@@ -2,9 +2,9 @@ package main
 
 import (
 	"html/template"
-	"log"
 	"net/http"
 
+	"github.com/jetzlstorfer/wattpilot-exporter/telemetry"
 	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
 )
 
@@ -53,10 +53,10 @@ func chartHandler(w http.ResponseWriter, _ *http.Request) {
 	tmpl, err := template.ParseFiles("charts.html")
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		log.Printf("chartHandler: template parse error: %v", err)
+		telemetry.Errorf("chartHandler: template parse error: %v", err)
 		return
 	}
 	if err := tmpl.Execute(w, ChartsData{Months: monthStats}); err != nil {
-		log.Printf("chartHandler: template execute error: %v", err)
+		telemetry.Errorf("chartHandler: template execute error: %v", err)
 	}
 }
