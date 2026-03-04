@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: wattpilot-exporter
+metadata:
+  template: wattpilot-exporter
+
+services:
+  wattpilot:
+    host: containerapp
+    project: ./src
+    language: go
+    docker:
+      path: Dockerfile
+      context: ./src

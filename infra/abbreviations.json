@@ -1,0 +1,8 @@
+{
+  "resourceGroup": "rg-",
+  "logAnalyticsWorkspace": "log-",
+  "keyVault": "kv-",
+  "containerAppsEnvironment": "cae-",
+  "containerApp": "ca-",
+  "containerRegistry": "cr"
+}
