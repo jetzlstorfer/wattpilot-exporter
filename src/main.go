@@ -39,7 +39,17 @@ func calculateData(date string) (Data, error) {
 	}
 
 	// Parse and format the date for display
-	parsedTime, _ := time.Parse("2006-01", monthToCalculate)
+	parsedTime, err := time.Parse("2006-01", monthToCalculate)
+	if err != nil {
+		log.Printf("Invalid date parameter %q: %v", monthToCalculate, err)
+		return Data{
+			Date:          monthToCalculate,
+			FormattedDate: "Invalid date",
+			PrevMonth:     "",
+			NextMonth:     "",
+			Error:         "The requested month is invalid. Please use format YYYY-MM.",
+		}, nil
+	}
 	formattedDate := parsedTime.Format("January 2006")
 
 	parsedData, err := wattpilotutils.GetStatsForMonth(monthToCalculate)
