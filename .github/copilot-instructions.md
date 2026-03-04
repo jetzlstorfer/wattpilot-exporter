@@ -45,7 +45,7 @@ The application is deployed to **Azure Container Apps** using:
 - **Infrastructure as Code**: Bicep templates in `infra/` (see `infra/main.bicep` and modules)
 - **Azure Developer CLI**: Configuration in `azure.yaml` for automated provisioning and deployment
 - **Secrets Management**: `WATTPILOT_KEY` stored securely in **Azure Key Vault**; the Container App uses a system-assigned managed identity to access it
-- **Container Build & Push**: `azd deploy` builds the Docker image and pushes it to Docker Hub as `jetzlstorfer/wattpilot-export:latest`
+- **Container Build & Push**: `azd deploy` builds the Docker image and pushes it to the Docker Hub repository `jetzlstorfer/wattpilot-export` using a timestamp-based image tag per deployment, then updates the Container App to use the new image
 
 ### Deployment workflow:
 
