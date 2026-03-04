@@ -37,4 +37,35 @@ The server uses Go's `net/http` standard library with `html/template` for render
 - **Electricity prices** are hardcoded per year as constants in `wattpilotutils.go` (e.g., `OfficialPricePerKwh2025`). When a new year's rate is published, add a new constant and update the switch statements in `getSellingPriceOfYear`, `getPurchasePriceOfYear`, and `GetOfficialPricePerKwhForMonth`.
 - **Data caching** — The app fetches from the API once and saves to `data.json`. Subsequent requests use the cache. Hit `/refresh` to re-fetch. The `make run` target deletes the cache before starting.
 - **Historical data starts from June 2024** — `GetPrevMonth` enforces this lower bound.
-- **Deployment** — Docker image built via GitHub Actions, pushed to Docker Hub, deployed to Azure Container Apps.
+
+## Azure Deployment
+
+The application is deployed to **Azure Container Apps** using:
+
+- **Infrastructure as Code**: Bicep templates in `infra/` (see `infra/main.bicep` and modules)
+- **Azure Developer CLI**: Configuration in `azure.yaml` for automated provisioning and deployment
+- **Secrets Management**: `WATTPILOT_KEY` stored securely in **Azure Key Vault**; the Container App uses a system-assigned managed identity to access it
+- **Container Build & Push**: `azd deploy` builds the Docker image and pushes it to Docker Hub as `jetzlstorfer/wattpilot-export:latest`
+
+### Deployment workflow:
+
+```bash
+cd /path/to/repo
+azd init -e <environment-name>        # Initialize environment
+azd env set AZURE_LOCATION swedencentral
+azd env set WATTPILOT_KEY <api-key>
+azd env set DOCKER_USERNAME <username>
+azd env set DOCKER_PASSWORD <token>
+azd provision                         # Create Azure resources
+azd deploy                            # Build image, push to Docker Hub, update Container App
+```
+
+See [AZD-SETUP.md](AZD-SETUP.md) for detailed instructions.
+
+### Infrastructure:
+- **Resource Group**: Groups all resources
+- **Container Apps Environment**: Managed hosting environment  
+- **Container App**: Runs the Go app (0.5 vCPU, 1Gi memory) on port 8080
+- **Key Vault**: Stores `WATTPILOT_KEY` secret
+- **Log Analytics Workspace**: Collects container logs
+- **Managed Identity**: RBAC access to Key Vault

@@ -29,7 +29,15 @@ func chartHandler(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	// get data from wattpilot
-	data := wattpilotutils.GetStatsForMonths(months)
+	data, err := wattpilotutils.GetStatsForMonths(months)
+	if err != nil {
+		// Log the error but still render the page with a message
+		log.Printf("chartHandler: failed to get stats: %v", err)
+		tmpl, _ := template.ParseFiles("charts.html")
+		tmpl.Execute(w, ChartsData{Months: []MonthStat{}})
+		return
+	}
+
 	var monthStats []MonthStat
 
 	for i, monthData := range data {

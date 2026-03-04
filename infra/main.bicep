@@ -13,7 +13,7 @@ param location string
 @description('The Wattpilot API key to store in Key Vault')
 param wattpilotKey string
 
-@description('Container image to deploy (e.g., jetzlstorfer/wattpilot-export:latest)')
+@description('Container image to deploy (azd will inject dynamic tag during deploy)')
 param containerImage string = 'jetzlstorfer/wattpilot-export:latest'
 
 @description('Docker Hub username for pulling images')

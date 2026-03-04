@@ -64,6 +64,44 @@ make docker-run
 
 > Make sure a `.env` file with your `WATTPILOT_KEY` exists in `src/` — it is passed to the container via `--env-file`.
 
+### Deploy to Azure
+
+This project is configured for deployment to **Azure Container Apps** using the **Azure Developer CLI (azd)**.
+
+**Prerequisites:**
+- [Azure Developer CLI (`azd`)](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/)
+- [Azure CLI (`az`)](https://learn.microsoft.com/en-us/cli/azure/)
+- An Azure subscription
+- Docker Hub account with push credentials
+
+**Quick start:**
+
+```bash
+# Login to Azure
+azd auth login
+
+# Initialize environment (from repo root)
+azd init -e wattpilot-prod
+
+# Configure
+azd env set AZURE_LOCATION swedencentral
+azd env set WATTPILOT_KEY <your-wattpilot-api-key>
+azd env set DOCKER_USERNAME <your-dockerhub-username>
+azd env set DOCKER_PASSWORD <your-dockerhub-password>
+azd env set CONTAINER_IMAGE jetzlstorfer/wattpilot-export:latest
+
+# Provision infrastructure
+azd provision
+
+# Deploy application
+azd deploy
+
+# Get the deployed URL
+azd env get-values | grep AZURE_CONTAINER_APP_FQDN
+```
+
+See [AZD-SETUP.md](AZD-SETUP.md) for detailed Azure deployment instructions.
+
 ## Routes
 
 | Route | Description |

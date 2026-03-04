@@ -55,8 +55,8 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'wattpilot'
           image: containerImage
           resources: {
-            cpu: json('0.25')
-            memory: '0.5Gi'
+            cpu: json('0.5')
+            memory: '1Gi'
           }
           env: [
             {

@@ -18,6 +18,7 @@ type SessionPoint struct {
 
 type Data struct {
 	Date             string
+	FormattedDate    string
 	PrevMonth        string
 	NextMonth        string
 	ChargingSessions int
@@ -27,6 +28,7 @@ type Data struct {
 	TotalPrice       float64
 	TotalMargin      float64
 	Sessions         []SessionPoint
+	Error            string
 }
 
 func calculateData(date string) (Data, error) {
@@ -36,7 +38,23 @@ func calculateData(date string) (Data, error) {
 		monthToCalculate = date
 	}
 
-	parsedData := wattpilotutils.GetStatsForMonth(monthToCalculate)
+	// Parse and format the date for display
+	parsedTime, _ := time.Parse("2006-01", monthToCalculate)
+	formattedDate := parsedTime.Format("January 2006")
+
+	parsedData, err := wattpilotutils.GetStatsForMonth(monthToCalculate)
+
+	// Return data with error message if fetch/parse failed
+	if err != nil {
+		log.Printf("Error fetching data: %v", err)
+		return Data{
+			Date:          monthToCalculate,
+			FormattedDate: formattedDate,
+			PrevMonth:     wattpilotutils.GetPrevMonth(monthToCalculate),
+			NextMonth:     wattpilotutils.GetNextMonth(monthToCalculate),
+			Error:         "Unable to fetch charging data. Please try refreshing or check back later.",
+		}, nil
+	}
 
 	// Calculate total energy & price
 	totalEnergy := 0.0
@@ -74,6 +92,7 @@ func calculateData(date string) (Data, error) {
 
 	return Data{
 		Date:             monthToCalculate,
+		FormattedDate:    formattedDate,
 		PrevMonth:        wattpilotutils.GetPrevMonth(monthToCalculate),
 		NextMonth:        wattpilotutils.GetNextMonth(monthToCalculate),
 		ChargingSessions: len(parsedData.Data),
@@ -102,8 +121,9 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 	date := r.URL.Query().Get("date")
 	data, err := calculateData(date)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		// Still show the UI even if there's an error in calculateData
+		// (though calculateData now returns nil errors and embeds error message in data)
+		log.Printf("mainHandler: error calculating data: %v", err)
 	}
 
 	tmpl, err := template.ParseFiles("template.html")
@@ -123,7 +143,12 @@ func faviconHandler(w http.ResponseWriter, r *http.Request) {
 
 func refreshHandler(w http.ResponseWriter, r *http.Request) {
 	// refresh data
-	wattpilotutils.RefreshData()
+	err := wattpilotutils.RefreshData()
+	if err != nil {
+		log.Printf("refreshHandler: failed to refresh data: %v", err)
+		http.Error(w, "Failed to refresh data. Please try again later.", http.StatusInternalServerError)
+		return
+	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
