@@ -33,8 +33,15 @@ func chartHandler(w http.ResponseWriter, _ *http.Request) {
 	if err != nil {
 		// Log the error but still render the page with a message
 		log.Printf("chartHandler: failed to get stats: %v", err)
-		tmpl, _ := template.ParseFiles("charts.html")
-		tmpl.Execute(w, ChartsData{Months: []MonthStat{}})
+		tmpl, tmplErr := template.ParseFiles("charts.html")
+		if tmplErr != nil {
+			log.Printf("chartHandler: template parse error in error path: %v", tmplErr)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		if execErr := tmpl.Execute(w, ChartsData{Months: []MonthStat{}}); execErr != nil {
+			log.Printf("chartHandler: template execute error in error path: %v", execErr)
+		}
 		return
 	}
 
