@@ -9,11 +9,16 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	_ "time/tzdata"
 )
+
+// refreshMu guards RefreshData to prevent concurrent writes to data files.
+var refreshMu sync.Mutex
 
 const OfficialPricePerKwh2024 = 0.33182
 const OfficialPricePerKwh2025 = 0.35889 // https://www.bmf.gv.at/themen/steuern/arbeitnehmerinnenveranlagung/pendlerfoerderung-das-pendlerpauschale/sachbezug-kraftfahrzeug.html
@@ -153,15 +158,27 @@ func readJSONFile(filename string) ([]byte, error) {
 }
 
 func saveJSONFile(filename string, jsonData []byte) error {
-	jsonFile, err := os.Create(filename)
+	// Write to a temp file in the same directory, then rename atomically
+	tmpFile, err := os.CreateTemp(filepath.Dir(filename), ".tmp-wattpilot-*.json")
 	if err != nil {
-		return fmt.Errorf("failed to create JSON file: %v", err)
+		return fmt.Errorf("failed to create temp file: %v", err)
 	}
-	defer jsonFile.Close()
+	tmpName := tmpFile.Name()
 
-	_, err = jsonFile.Write(jsonData)
+	_, err = tmpFile.Write(jsonData)
+	closeErr := tmpFile.Close()
 	if err != nil {
+		os.Remove(tmpName)
 		return fmt.Errorf("failed to write JSON data: %v", err)
+	}
+	if closeErr != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("failed to close temp file: %v", closeErr)
+	}
+
+	if err := os.Rename(tmpName, filename); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("failed to rename temp file to %s: %v", filename, err)
 	}
 	return nil
 }
@@ -410,6 +427,9 @@ func CalculatePriceMargin(endTime string, energy float64, eco float64) float64 {
 }
 
 func RefreshData() error {
+	refreshMu.Lock()
+	defer refreshMu.Unlock()
+
 	key := os.Getenv("WATTPILOT_KEY")
 
 	// Validate that we have a WATTPILOT_KEY before attempting to fetch
