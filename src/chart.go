@@ -20,7 +20,9 @@ type ChartsData struct {
 	Months []MonthStat
 }
 
-func chartHandler(w http.ResponseWriter, _ *http.Request) {
+func chartHandler(w http.ResponseWriter, r *http.Request) {
+	_, span := telemetry.StartSpan(r.Context(), "chartHandler")
+	defer span.End()
 	// generate all months since June 2024
 	firstMonthWithData := "2024-06"
 	months := []string{firstMonthWithData}

@@ -8,6 +8,7 @@ import (
 	"github.com/jetzlstorfer/wattpilot-exporter/telemetry"
 	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
 	"github.com/xuri/excelize/v2"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // getEntryValue maps a wattpilot column key to the corresponding field value
@@ -50,12 +51,15 @@ func getEntryValue(key string, entry wattpilotutils.WattpilotEntry) interface{} 
 }
 
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
+	_, span := telemetry.StartSpan(r.Context(), "downloadHandler")
+	defer span.End()
 	date := r.URL.Query().Get("date")
 
 	monthToCalculate := time.Now().Format("2006-01")
 	if date != "" {
 		monthToCalculate = date
 	}
+	span.SetAttributes(attribute.String("month", monthToCalculate))
 
 	// Get the full wattpilot data for the month (preserving CSV structure)
 	parsedData := wattpilotutils.GetStatsForMonth(monthToCalculate)

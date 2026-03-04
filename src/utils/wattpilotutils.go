@@ -1,6 +1,7 @@
 package wattpilotutils
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -312,7 +313,9 @@ func CalculatePriceMargin(endTime string, energy float64, eco float64) float64 {
 	}
 }
 
-func RefreshData() {
+func RefreshData(ctx context.Context) {
+	ctx, span := telemetry.StartSpan(ctx, "RefreshData")
+	defer span.End()
 	key := os.Getenv("WATTPILOT_KEY")
 	myUrl := PrepUrl(WattpilotDataUrl, "", "", key)
 	// Fetch JSON document from the web

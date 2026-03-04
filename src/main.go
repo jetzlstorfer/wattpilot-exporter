@@ -11,6 +11,7 @@ import (
 	"github.com/jetzlstorfer/wattpilot-exporter/telemetry"
 	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
 	"github.com/joho/godotenv"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type SessionPoint struct {
@@ -32,12 +33,15 @@ type Data struct {
 	Sessions         []SessionPoint
 }
 
-func calculateData(date string) (Data, error) {
+func calculateData(ctx context.Context, date string) (Data, error) {
 
 	monthToCalculate := time.Now().Format("2006-01")
 	if date != "" {
 		monthToCalculate = date
 	}
+
+	ctx, span := telemetry.StartSpan(ctx, "calculateData", attribute.String("month", monthToCalculate))
+	defer span.End()
 
 	parsedData := wattpilotutils.GetStatsForMonth(monthToCalculate)
 
@@ -90,6 +94,9 @@ func calculateData(date string) (Data, error) {
 }
 
 func infoHandler(w http.ResponseWriter, r *http.Request) {
+	_, span := telemetry.StartSpan(r.Context(), "infoHandler")
+	defer span.End()
+
 	tmpl, err := template.ParseFiles("info.html")
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -102,8 +109,12 @@ func infoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	date := r.URL.Query().Get("date")
-	data, err := calculateData(date)
+	ctx, span := telemetry.StartSpan(ctx, "mainHandler", attribute.String("query.date", date))
+	defer span.End()
+
+	data, err := calculateData(ctx, date)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -121,12 +132,17 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func faviconHandler(w http.ResponseWriter, r *http.Request) {
+	_, span := telemetry.StartSpan(r.Context(), "faviconHandler")
+	defer span.End()
+
 	http.ServeFile(w, r, "favicon.ico")
 }
 
 func refreshHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "refreshHandler")
+	defer span.End()
 	// refresh data
-	wattpilotutils.RefreshData()
+	wattpilotutils.RefreshData(ctx)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 

@@ -7,12 +7,16 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/log/global"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const defaultServiceName = "wattpilot-exporter"
@@ -22,11 +26,17 @@ var (
 	loggerInitErr error
 	loggerOnce    sync.Once
 	provider      *sdklog.LoggerProvider
+	traceProvider *sdktrace.TracerProvider
+	tracer        trace.Tracer
 )
 
-// Init sets up an OpenTelemetry LoggerProvider that exports to stdout so logs remain visible on the console.
+// Init sets up OpenTelemetry LoggerProvider and TracerProvider that export to stdout so telemetry remains visible on the console.
 func Init(ctx context.Context) error {
 	loggerOnce.Do(func() {
+		res := resource.NewSchemaless(
+			attribute.String("service.name", defaultServiceName),
+		)
+
 		exporter, err := stdoutlog.New(stdoutlog.WithWriter(os.Stdout))
 		if err != nil {
 			loggerInitErr = err
@@ -35,18 +45,33 @@ func Init(ctx context.Context) error {
 
 		provider = sdklog.NewLoggerProvider(
 			sdklog.WithProcessor(sdklog.NewSimpleProcessor(exporter)),
-			sdklog.WithResource(resource.NewSchemaless(
-				attribute.String("service.name", defaultServiceName),
-			)),
+			sdklog.WithResource(res),
 		)
 		global.SetLoggerProvider(provider)
 		logger = provider.Logger(defaultServiceName)
+
+		traceExp, err := stdouttrace.New(stdouttrace.WithWriter(os.Stdout), stdouttrace.WithPrettyPrint())
+		if err != nil {
+			loggerInitErr = err
+			return
+		}
+		traceProvider = sdktrace.NewTracerProvider(
+			sdktrace.WithBatcher(traceExp),
+			sdktrace.WithResource(res),
+		)
+		otel.SetTracerProvider(traceProvider)
+		tracer = traceProvider.Tracer(defaultServiceName)
 	})
 	return loggerInitErr
 }
 
 // Shutdown flushes and closes the configured LoggerProvider.
 func Shutdown(ctx context.Context) error {
+	if traceProvider != nil {
+		if err := traceProvider.Shutdown(ctx); err != nil {
+			return err
+		}
+	}
 	if provider == nil {
 		return nil
 	}
@@ -58,6 +83,22 @@ func ensureLogger(ctx context.Context) {
 		return
 	}
 	_ = Init(ctx)
+}
+
+func ensureTracer(ctx context.Context) {
+	if tracer != nil || loggerInitErr != nil {
+		return
+	}
+	_ = Init(ctx)
+}
+
+// StartSpan starts a new tracing span with optional attributes.
+func StartSpan(ctx context.Context, name string, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
+	ensureTracer(ctx)
+	if tracer == nil {
+		return ctx, trace.SpanFromContext(ctx)
+	}
+	return tracer.Start(ctx, name, trace.WithAttributes(attrs...))
 }
 
 func emit(ctx context.Context, severity log.Severity, severityText, msg string) {
