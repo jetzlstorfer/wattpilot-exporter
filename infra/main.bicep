@@ -80,7 +80,6 @@ module containerApp 'modules/container-app.bicep' = {
     tags: tags
     containerAppsEnvironmentId: containerAppsEnv.outputs.id
     containerImage: containerImage
-    keyVaultName: keyVault.outputs.name
     keyVaultSecretUri: keyVault.outputs.secretUri
     dockerUsername: dockerUsername
     dockerPassword: dockerPassword
