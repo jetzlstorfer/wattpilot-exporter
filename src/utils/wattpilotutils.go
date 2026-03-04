@@ -176,7 +176,11 @@ func createMonthlyBackups(allData WattpilotData) error {
 	monthDataMap := make(map[string][]WattpilotEntry)
 
 	for _, entry := range allData.Data {
-		month, _ := time.Parse("02.01.2006 15:04:05", entry.End)
+		month, err := time.Parse("02.01.2006 15:04:05", entry.End)
+		if err != nil {
+			log.Printf("Warning: skipping entry with invalid End time %q: %v", entry.End, err)
+			continue
+		}
 		monthKey := month.Format("2006-01")
 		monthDataMap[monthKey] = append(monthDataMap[monthKey], entry)
 	}
