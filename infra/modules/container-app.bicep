@@ -3,7 +3,6 @@ param location string
 param tags object = {}
 param containerAppsEnvironmentId string
 param containerImage string
-param keyVaultName string
 param keyVaultSecretUri string
 param dockerUsername string = ''
 @secure()
