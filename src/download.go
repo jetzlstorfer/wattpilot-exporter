@@ -58,7 +58,12 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the full wattpilot data for the month (preserving CSV structure)
-	parsedData := wattpilotutils.GetStatsForMonth(monthToCalculate)
+	parsedData, err := wattpilotutils.GetStatsForMonth(monthToCalculate)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Unable to generate report: %v", err), http.StatusInternalServerError)
+		log.Printf("downloadHandler: failed to get stats: %v", err)
+		return
+	}
 
 	f := excelize.NewFile()
 	defer f.Close()

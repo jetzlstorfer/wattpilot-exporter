@@ -9,11 +9,16 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	_ "time/tzdata"
 )
+
+// refreshMu guards RefreshData to prevent concurrent writes to data files.
+var refreshMu sync.Mutex
 
 const OfficialPricePerKwh2024 = 0.33182
 const OfficialPricePerKwh2025 = 0.35889 // https://www.bmf.gv.at/themen/steuern/arbeitnehmerinnenveranlagung/pendlerfoerderung-das-pendlerpauschale/sachbezug-kraftfahrzeug.html
@@ -23,6 +28,7 @@ const PurchasePricePerKwh2025 = 0.25
 const PurchasePricePerKwh2026 = 0.25
 const JSONFileName = "data.json"
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
+const DataTTLMinutes = 60 // Auto-refresh data if older than this many minutes
 
 type WattpilotColumn struct {
 	Key       string `json:"key"`
@@ -84,28 +90,54 @@ func FetchJSON(url string) ([]byte, error) {
 	return jsonData, nil
 }
 
+// isDataStale checks if the data.json file is older than DataTTLMinutes
+func isDataStale() bool {
+	fileInfo, err := os.Stat(JSONFileName)
+	if err != nil {
+		// File doesn't exist or can't be accessed - consider it stale
+		return true
+	}
+
+	fileAge := time.Since(fileInfo.ModTime())
+	ttl := time.Duration(DataTTLMinutes) * time.Minute
+
+	return fileAge > ttl
+}
+
+// tryAutoRefresh attempts to refresh data if it's stale and WATTPILOT_KEY is set
+// Returns true if a refresh was attempted (regardless of success/failure)
+func tryAutoRefresh() bool {
+	if !isDataStale() {
+		return false // Data is fresh, no need to refresh
+	}
+
+	key := os.Getenv("WATTPILOT_KEY")
+	if key == "" {
+		log.Println("Data is stale but WATTPILOT_KEY not set - skipping auto-refresh")
+		return false
+	}
+
+	log.Println("Data is stale, attempting automatic refresh...")
+	err := RefreshData()
+	if err != nil {
+		log.Printf("Auto-refresh failed: %v (will use cached/backup data)", err)
+		return true // Attempted but failed
+	}
+
+	log.Println("Auto-refresh successful")
+	return true // Attempted and succeeded
+}
+
 func GetJSONData() ([]byte, error) {
-	// Read JSON document from file.
+	// Try to auto-refresh if data is stale
+	tryAutoRefresh()
+
+	// Read JSON document from file (whether it's fresh or stale)
 	jsonData, err := readJSONFile(JSONFileName)
 	if err != nil {
 		log.Printf("Failed to read JSON file: %v", err)
-	}
-
-	// If JSON file not found, fetch data from the web and store in file.
-	if jsonData == nil {
-		log.Println("JSON file not found, fetching data from the web")
-		key := os.Getenv("WATTPILOT_KEY")
-		myUrl := PrepUrl(WattpilotDataUrl, "", "", key)
-
-		// Fetch JSON document from the web.
-		jsonData, err = FetchJSON(myUrl) // Remove the redeclaration of jsonData
-		if err != nil || jsonData == nil {
-			log.Fatalf("Failed to fetch JSON: %v", err)
-		}
-		err = saveJSONFile(JSONFileName, jsonData)
-		if err != nil {
-			log.Fatalf("Failed to save JSON file: %v", err)
-		}
+		// Don't auto-fetch here anymore - let the caller decide whether to use backup or fetch
+		return nil, err
 	}
 
 	return jsonData, nil
@@ -126,17 +158,77 @@ func readJSONFile(filename string) ([]byte, error) {
 }
 
 func saveJSONFile(filename string, jsonData []byte) error {
-	jsonFile, err := os.Create(filename)
+	// Write to a temp file in the same directory, then rename atomically
+	tmpFile, err := os.CreateTemp(filepath.Dir(filename), ".tmp-wattpilot-*.json")
 	if err != nil {
-		return fmt.Errorf("failed to create JSON file: %v", err)
+		return fmt.Errorf("failed to create temp file: %v", err)
 	}
-	defer jsonFile.Close()
+	tmpName := tmpFile.Name()
 
-	_, err = jsonFile.Write(jsonData)
+	_, err = tmpFile.Write(jsonData)
+	closeErr := tmpFile.Close()
 	if err != nil {
+		os.Remove(tmpName)
 		return fmt.Errorf("failed to write JSON data: %v", err)
 	}
+	if closeErr != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("failed to close temp file: %v", closeErr)
+	}
+
+	if err := os.Rename(tmpName, filename); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("failed to rename temp file to %s: %v", filename, err)
+	}
 	return nil
+}
+
+func getMonthlyBackupFilename(yearMonth string) string {
+	return fmt.Sprintf("data-%s_backup.json", yearMonth)
+}
+
+// createMonthlyBackups extracts data for each month and saves it to a backup file
+func createMonthlyBackups(allData WattpilotData) error {
+	// Group data by month
+	monthDataMap := make(map[string][]WattpilotEntry)
+
+	for _, entry := range allData.Data {
+		month, err := time.Parse("02.01.2006 15:04:05", entry.End)
+		if err != nil {
+			log.Printf("Warning: skipping entry with invalid End time %q: %v", entry.End, err)
+			continue
+		}
+		monthKey := month.Format("2006-01")
+		monthDataMap[monthKey] = append(monthDataMap[monthKey], entry)
+	}
+
+	// Save backup for each month
+	for monthKey, entries := range monthDataMap {
+		monthlyBackupData := WattpilotData{
+			Columns: allData.Columns,
+			Data:    entries,
+		}
+
+		backupBytes, err := json.Marshal(monthlyBackupData)
+		if err != nil {
+			return fmt.Errorf("failed to marshal backup data for %s: %v", monthKey, err)
+		}
+
+		backupFilename := getMonthlyBackupFilename(monthKey)
+		err = saveJSONFile(backupFilename, backupBytes)
+		if err != nil {
+			log.Printf("Warning: failed to create backup for %s: %v", monthKey, err)
+			// Don't fail the entire operation if one backup fails
+		}
+	}
+
+	return nil
+}
+
+// tryMonthlyBackup attempts to read data from a monthly backup file
+func tryMonthlyBackup(monthYearStr string) ([]byte, error) {
+	backupFilename := getMonthlyBackupFilename(monthYearStr)
+	return readJSONFile(backupFilename)
 }
 
 func PrepUrl(wattpilotDataUrl string, from string, to string, key string) string {
@@ -201,23 +293,41 @@ func GetNextMonth(yearMonth string) string {
 	return t.Format("2006-01")
 }
 
-func GetStatsForMonth(monthToCalculate string) WattpilotData {
-	// year-month into unix timestamp
-	//from := GetUnixTimestampStart(monthToCalculate)
-	//to := GetUnixTimestampEnd(monthToCalculate)
-	//key := os.Getenv("WATTPILOT_KEY")
-	//myUrl := PrepUrl(WattpilotDataUrl, from, to, key)
-
-	// Fetch JSON document from the web
+func GetStatsForMonth(monthToCalculate string) (WattpilotData, error) {
+	// Try to get data from the main JSON file
 	jsonData, err := GetJSONData()
+	usedMainFile := err == nil
+
+	// If main file doesn't exist or is corrupted, try monthly backup
 	if err != nil {
-		log.Fatalf("Failed to fetch JSON: %v", err)
+		log.Printf("Main data file unavailable for %s, trying backup: %v", monthToCalculate, err)
+		backupData, backupErr := tryMonthlyBackup(monthToCalculate)
+		if backupErr != nil {
+			// Both main and backup failed
+			return WattpilotData{}, fmt.Errorf("failed to fetch JSON from main file and backup: main=%v, backup=%v", err, backupErr)
+		}
+		jsonData = backupData
+		log.Printf("Using backup data for month %s", monthToCalculate)
 	}
 
 	// Parse JSON document
 	parsedData, err := ParseJSON(jsonData)
 	if err != nil {
-		log.Fatalf("Failed to parse JSON: %v", err)
+		// Main parsing failed, try backup if we were using the main file
+		if usedMainFile {
+			log.Printf("Failed to parse main JSON: %v, trying backup", err)
+			backupData, backupErr := tryMonthlyBackup(monthToCalculate)
+			if backupErr != nil {
+				return WattpilotData{}, fmt.Errorf("failed to parse JSON: %v", err)
+			}
+			parsedData, err = ParseJSON(backupData)
+			if err != nil {
+				return WattpilotData{}, fmt.Errorf("failed to parse backup JSON: %v", err)
+			}
+			log.Printf("Using backup data for month %s after parse failure", monthToCalculate)
+		} else {
+			return WattpilotData{}, fmt.Errorf("failed to parse JSON: %v", err)
+		}
 	}
 
 	// now convert the data to the correct format
@@ -236,15 +346,20 @@ func GetStatsForMonth(monthToCalculate string) WattpilotData {
 	}
 
 	monthlyData.Data = newData
-	return monthlyData
+	return monthlyData, nil
 }
 
-func GetStatsForMonths(months []string) []WattpilotData {
+func GetStatsForMonths(months []string) ([]WattpilotData, error) {
 	var data []WattpilotData
 	for _, month := range months {
-		data = append(data, GetStatsForMonth(strings.TrimSpace(month)))
+		monthData, err := GetStatsForMonth(strings.TrimSpace(month))
+		if err != nil {
+			// Return the data collected so far and the error
+			return data, fmt.Errorf("failed to get stats for month %s: %v", month, err)
+		}
+		data = append(data, monthData)
 	}
-	return data
+	return data, nil
 }
 
 func RoundFloat(val float64, precision uint) float64 {
@@ -311,18 +426,46 @@ func CalculatePriceMargin(endTime string, energy float64, eco float64) float64 {
 	}
 }
 
-func RefreshData() {
+func RefreshData() error {
+	refreshMu.Lock()
+	defer refreshMu.Unlock()
+
 	key := os.Getenv("WATTPILOT_KEY")
+
+	// Validate that we have a WATTPILOT_KEY before attempting to fetch
+	if key == "" {
+		return fmt.Errorf("WATTPILOT_KEY environment variable is not set - cannot fetch data from API")
+	}
+
 	myUrl := PrepUrl(WattpilotDataUrl, "", "", key)
+
 	// Fetch JSON document from the web
 	jsonData, err := FetchJSON(myUrl)
 	if err != nil {
-		log.Fatalf("Failed to fetch JSON: %v", err)
+		return fmt.Errorf("failed to fetch JSON from API: %v", err)
 	}
 
-	// Save JSON document to file
+	// Parse the data to validate it before saving
+	parsedData, err := ParseJSON(jsonData)
+	if err != nil {
+		return fmt.Errorf("failed to parse fetched JSON: %v", err)
+	}
+
+	// Save JSON document to main file
 	err = saveJSONFile(JSONFileName, jsonData)
 	if err != nil {
-		log.Fatalf("Failed to save JSON file: %v", err)
+		return fmt.Errorf("failed to save JSON file: %v", err)
 	}
+
+	// Create monthly backups for each month in the fetched data
+	err = createMonthlyBackups(parsedData)
+	if err != nil {
+		// Log the error but don't fail - we successfully saved the main file
+		log.Printf("Warning: failed to create some backups: %v", err)
+	} else {
+		log.Println("Successfully created monthly backups")
+	}
+
+	log.Println("Data refreshed successfully")
+	return nil
 }
