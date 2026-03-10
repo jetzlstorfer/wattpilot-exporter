@@ -9,8 +9,12 @@ on:
   pull_request_target:
     branches: 
       [ main ]
-  # Allow mannually trigger 
+  # Allow manually trigger 
   workflow_dispatch:      
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   id-token: write # This is required for requesting the JWT
