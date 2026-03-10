@@ -36,7 +36,7 @@ jobs:
           password: ${{ secrets.WATTPILOT_REGISTRY_PASSWORD }}
 
       - name: Build and push container image to registry
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           push: true
           tags: jetzlstorfer/wattpilot-export:${{ github.sha }}
