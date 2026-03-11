@@ -148,7 +148,8 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func faviconHandler(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/favicon.svg", http.StatusMovedPermanently)
+	w.Header().Set("Content-Type", "image/x-icon")
+	http.ServeFile(w, r, "favicon.ico")
 }
 
 func faviconSVGHandler(w http.ResponseWriter, r *http.Request) {
