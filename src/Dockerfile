@@ -23,6 +23,7 @@ COPY --from=builder /wattpilot-export .
 COPY --from=builder /app/template.html .
 COPY --from=builder /app/charts.html .
 COPY --from=builder /app/info.html .
+COPY --from=builder /app/favicon.svg .
 COPY --from=builder /app/favicon.ico .
 COPY --from=builder /app/static ./static
 

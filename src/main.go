@@ -148,7 +148,13 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func faviconHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/x-icon")
 	http.ServeFile(w, r, "favicon.ico")
+}
+
+func faviconSVGHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/svg+xml")
+	http.ServeFile(w, r, "favicon.svg")
 }
 
 func refreshHandler(w http.ResponseWriter, r *http.Request) {
@@ -176,6 +182,7 @@ func main() {
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	http.HandleFunc("/", mainHandler)
 	http.HandleFunc("/favicon.ico", faviconHandler)
+	http.HandleFunc("/favicon.svg", faviconSVGHandler)
 	http.HandleFunc("/refresh", refreshHandler)
 	http.HandleFunc("/charts", chartHandler)
 	http.HandleFunc("/info", infoHandler)
