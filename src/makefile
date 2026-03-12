@@ -19,16 +19,28 @@ build:
 
 # Run the application
 run:
-	rm -f data.json
+	rm -f data/data.json
+	@pid=`command -v lsof >/dev/null 2>&1 && lsof -ti tcp:8080 -sTCP:LISTEN 2>/dev/null | head -n 1 || true`; \
+	if [ -n "$$pid" ]; then \
+		echo "Port 8080 already in use (PID $$pid). Stopping old process..."; \
+		kill $$pid; \
+		sleep 1; \
+	fi
 	$(GO) run $(RUN_FLAGS) .
 
-run-cached: # don't delete data.json before running
+run-cached: # don't delete data/data.json before running
+	@pid=`command -v lsof >/dev/null 2>&1 && lsof -ti tcp:8080 -sTCP:LISTEN 2>/dev/null | head -n 1 || true`; \
+	if [ -n "$$pid" ]; then \
+		echo "Port 8080 already in use (PID $$pid). Stopping old process..."; \
+		kill $$pid; \
+		sleep 1; \
+	fi
 	$(GO) run $(RUN_FLAGS) . 
 
 # Clean the build artifacts
 clean:
 	rm -f $(EXECUTABLE)
-	rm -f data.json
+	rm -f data/data.json
 
 docker-build:
 	docker build -t jetzlstorfer/wattpilot-exporter:local .

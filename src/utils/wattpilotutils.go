@@ -34,7 +34,7 @@ const OfficialPricePerKwh2026 = 0.32806
 const PurchasePricePerKwh2024 = 0.2824
 const PurchasePricePerKwh2025 = 0.25
 const PurchasePricePerKwh2026 = 0.25
-const JSONFileName = "data.json"
+const JSONFileName = "data/data.json"
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 const DataTTLMinutes = 60 // Auto-refresh data if older than this many minutes
 
@@ -114,7 +114,7 @@ func FetchJSON(ctx context.Context, fetchURL string) ([]byte, error) {
 	return jsonData, nil
 }
 
-// isDataStale checks if the data.json file is older than DataTTLMinutes
+// isDataStale checks if the data/data.json file is older than DataTTLMinutes
 func isDataStale() bool {
 	fileInfo, err := os.Stat(JSONFileName)
 	if err != nil {
@@ -182,6 +182,10 @@ func readJSONFile(filename string) ([]byte, error) {
 }
 
 func saveJSONFile(filename string, jsonData []byte) error {
+	if err := os.MkdirAll(filepath.Dir(filename), 0o755); err != nil {
+		return fmt.Errorf("failed to create directory for %s: %v", filename, err)
+	}
+
 	// Write to a temp file in the same directory, then rename atomically
 	tmpFile, err := os.CreateTemp(filepath.Dir(filename), ".tmp-wattpilot-*.json")
 	if err != nil {
@@ -208,7 +212,7 @@ func saveJSONFile(filename string, jsonData []byte) error {
 }
 
 func getMonthlyBackupFilename(yearMonth string) string {
-	return fmt.Sprintf("data-%s_backup.json", yearMonth)
+	return fmt.Sprintf("data/data-%s_backup.json", yearMonth)
 }
 
 // createMonthlyBackups extracts data for each month and saves it to a backup file

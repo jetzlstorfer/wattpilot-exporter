@@ -8,7 +8,7 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 - **Historical charts** — visualize energy consumption and costs over time (data since June 2024)
 - **Excel export** — download a per-month `.xlsx` billing report with detailed session data and cost summary
 - **Live charging indicator** — detects whether a charging session is currently active
-- **Data caching** — fetched data is cached locally as `data.json`; use the `/refresh` endpoint to re-fetch
+- **Data caching** — fetched data is cached locally as `data/data.json`; monthly backups are stored as `data/*_backup.json`; use the `/refresh` endpoint to re-fetch
 - **OpenTelemetry observability** — automatic HTTP request traces, app-level spans, and structured logs
 - **Docker support** — multi-stage Docker build for minimal container images
 
@@ -75,8 +75,8 @@ Or use the Makefile:
 
 ```bash
 cd src
-make run        # fetches fresh data (deletes cached data.json first)
-make run-cached # uses cached data.json if available
+make run        # fetches fresh data (deletes cached data/data.json first)
+make run-cached # uses cached data/data.json if available
 ```
 
 The application starts on **http://localhost:8080**.
@@ -165,6 +165,7 @@ src/
 ├── main.go          # HTTP server, routes & main handler
 ├── chart.go         # /charts handler — historical month-over-month stats
 ├── download.go      # /download handler — Excel export
+├── data/            # cached data.json and monthly *_backup.json files
 ├── utils/
 │   └── wattpilotutils.go  # API client, price calculation, data parsing
 ├── template.html    # Main dashboard template

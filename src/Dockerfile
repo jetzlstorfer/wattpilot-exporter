@@ -26,6 +26,7 @@ COPY --from=builder /app/info.html .
 COPY --from=builder /app/favicon.svg .
 COPY --from=builder /app/favicon.ico .
 COPY --from=builder /app/static ./static
+COPY --from=builder /app/data ./data
 
 # Update Alpine packages to ensure latest security patches
 RUN apk update && apk upgrade --no-cache
