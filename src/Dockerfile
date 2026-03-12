@@ -13,6 +13,9 @@ RUN go mod download
 # Build the Go app
 RUN go build -o /wattpilot-export 
 
+# Ensure the data directory exists even when it is empty and not tracked in git
+RUN mkdir -p /app/data
+
 # Start a new stage from scratch
 FROM alpine:3.23
 
