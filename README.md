@@ -11,6 +11,8 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 - **Data caching** — fetched data is cached locally as `data.json`; use the `/refresh` endpoint to re-fetch
 - **Docker support** — multi-stage Docker build for minimal container images
 
+![Dashboard Screenshot](./assets//dashboard-screenshot.png)
+
 ## Prerequisites
 
 - **Go 1.25+** (or Docker)
