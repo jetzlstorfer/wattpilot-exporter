@@ -1,10 +1,21 @@
 package main
 
 import (
+	"context"
 	"html/template"
 	"log"
+	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
+
+	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 
 	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
 	"github.com/joho/godotenv"
@@ -31,17 +42,22 @@ type Data struct {
 	Error            string
 }
 
-func calculateData(date string) (Data, error) {
+var tracer = otel.Tracer("github.com/jetzlstorfer/wattpilot-exporter")
+
+func calculateData(ctx context.Context, date string) (Data, error) {
+	ctx, span := tracer.Start(ctx, "calculateData")
+	defer span.End()
 
 	monthToCalculate := time.Now().Format("2006-01")
 	if date != "" {
 		monthToCalculate = date
 	}
+	span.SetAttributes(attribute.String("month", monthToCalculate))
 
 	// Parse and format the date for display
 	parsedTime, err := time.Parse("2006-01", monthToCalculate)
 	if err != nil {
-		log.Printf("Invalid date parameter %q: %v", monthToCalculate, err)
+		slog.WarnContext(ctx, "Invalid date parameter", "date", monthToCalculate, "error", err)
 		return Data{
 			Date:          monthToCalculate,
 			FormattedDate: "Invalid date",
@@ -52,11 +68,13 @@ func calculateData(date string) (Data, error) {
 	}
 	formattedDate := parsedTime.Format("January 2006")
 
-	parsedData, err := wattpilotutils.GetStatsForMonth(monthToCalculate)
+	parsedData, err := wattpilotutils.GetStatsForMonth(ctx, monthToCalculate)
 
 	// Return data with error message if fetch/parse failed
 	if err != nil {
-		log.Printf("Error fetching data: %v", err)
+		slog.ErrorContext(ctx, "Error fetching data", "error", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return Data{
 			Date:          monthToCalculate,
 			FormattedDate: formattedDate,
@@ -119,31 +137,31 @@ func infoHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.ParseFiles("info.html")
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		log.Printf("infoHandler: template parse error: %v", err)
+		slog.ErrorContext(r.Context(), "infoHandler: template parse error", "error", err)
 		return
 	}
 	if err := tmpl.Execute(w, nil); err != nil {
-		log.Printf("infoHandler: template execute error: %v", err)
+		slog.ErrorContext(r.Context(), "infoHandler: template execute error", "error", err)
 	}
 }
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
 	date := r.URL.Query().Get("date")
-	data, err := calculateData(date)
+	data, err := calculateData(r.Context(), date)
 	if err != nil {
 		// Still show the UI even if there's an error in calculateData
 		// (though calculateData now returns nil errors and embeds error message in data)
-		log.Printf("mainHandler: error calculating data: %v", err)
+		slog.ErrorContext(r.Context(), "mainHandler: error calculating data", "error", err)
 	}
 
 	tmpl, err := template.ParseFiles("template.html")
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		log.Printf("mainHandler: template parse error: %v", err)
+		slog.ErrorContext(r.Context(), "mainHandler: template parse error", "error", err)
 		return
 	}
 	if err := tmpl.Execute(w, data); err != nil {
-		log.Printf("mainHandler: template execute error: %v", err)
+		slog.ErrorContext(r.Context(), "mainHandler: template execute error", "error", err)
 	}
 }
 
@@ -159,9 +177,9 @@ func faviconSVGHandler(w http.ResponseWriter, r *http.Request) {
 
 func refreshHandler(w http.ResponseWriter, r *http.Request) {
 	// refresh data
-	err := wattpilotutils.RefreshData()
+	err := wattpilotutils.RefreshData(r.Context())
 	if err != nil {
-		log.Printf("refreshHandler: failed to refresh data: %v", err)
+		slog.ErrorContext(r.Context(), "refreshHandler: failed to refresh data", "error", err)
 		http.Error(w, "Failed to refresh data. Please try again later.", http.StatusInternalServerError)
 		return
 	}
@@ -169,24 +187,66 @@ func refreshHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	// get env variables from .env file
 	// Using Overload() instead of Load() to ensure .env always takes precedence
 	// over any pre-existing environment variables (e.g. empty WATTPILOT_KEY in shell)
-	err := godotenv.Overload()
-	if err != nil {
-		//log.Fatal("Error loading .env file")
-		log.Println("Error loading .env file: " + err.Error())
+	if err := godotenv.Overload(); err != nil {
+		// Not fatal — the variable may already be in the environment
+		log.Println("Note: .env file not loaded:", err)
 	}
 
-	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
-	http.HandleFunc("/", mainHandler)
-	http.HandleFunc("/favicon.ico", faviconHandler)
-	http.HandleFunc("/favicon.svg", faviconSVGHandler)
-	http.HandleFunc("/refresh", refreshHandler)
-	http.HandleFunc("/charts", chartHandler)
-	http.HandleFunc("/info", infoHandler)
-	http.HandleFunc("/download", downloadHandler)
-	log.Println("Starting server on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	// Initialise OpenTelemetry (traces + logs).
+	shutdown, err := initTelemetry(ctx)
+	if err != nil {
+		log.Fatalf("Failed to initialise telemetry: %v", err)
+	}
+	defer func() {
+		if err := shutdown(context.Background()); err != nil {
+			log.Printf("Telemetry shutdown error: %v", err)
+		}
+	}()
+
+	// Replace the default slog logger with one that bridges to OTel.
+	logger := otelslog.NewLogger(serviceName)
+	slog.SetDefault(logger)
+
+	mux := http.NewServeMux()
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	mux.HandleFunc("/favicon.ico", faviconHandler)
+	mux.HandleFunc("/favicon.svg", faviconSVGHandler)
+	mux.HandleFunc("/", mainHandler)
+	mux.HandleFunc("/refresh", refreshHandler)
+	mux.HandleFunc("/charts", chartHandler)
+	mux.HandleFunc("/info", infoHandler)
+	mux.HandleFunc("/download", downloadHandler)
+
+	// Wrap the entire mux with the OTel HTTP middleware so every request gets
+	// a trace span, propagation headers are read/written, and standard HTTP
+	// attributes (method, path, status code, …) are recorded automatically.
+	handler := otelhttp.NewHandler(mux, "wattpilot-exporter")
+
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: handler,
+	}
+
+	slog.InfoContext(ctx, "Starting server", "addr", ":8080")
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("Server error", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	<-ctx.Done()
+	slog.InfoContext(context.Background(), "Shutting down server...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slog.Error("Server shutdown error", "error", err)
+	}
 }

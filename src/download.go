@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -50,6 +50,7 @@ func getEntryValue(key string, entry wattpilotutils.WattpilotEntry) interface{} 
 }
 
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	date := r.URL.Query().Get("date")
 
 	monthToCalculate := time.Now().Format("2006-01")
@@ -58,10 +59,10 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the full wattpilot data for the month (preserving CSV structure)
-	parsedData, err := wattpilotutils.GetStatsForMonth(monthToCalculate)
+	parsedData, err := wattpilotutils.GetStatsForMonth(ctx, monthToCalculate)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Unable to generate report: %v", err), http.StatusInternalServerError)
-		log.Printf("downloadHandler: failed to get stats: %v", err)
+		slog.ErrorContext(ctx, "downloadHandler: failed to get stats", "error", err)
 		return
 	}
 
@@ -99,7 +100,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	for i, col := range columns {
 		if err := setCellOrError(i+1, 1, col.Caption); err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			log.Printf("downloadHandler: header cell error: %v", err)
+			slog.ErrorContext(ctx, "downloadHandler: header cell error", "error", err)
 			return
 		}
 	}
@@ -119,7 +120,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 			val := getEntryValue(col.Key, entry)
 			if err := setCellOrError(j+1, row, val); err != nil {
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-				log.Printf("downloadHandler: data cell error: %v", err)
+				slog.ErrorContext(ctx, "downloadHandler: data cell error", "error", err)
 				return
 			}
 		}
@@ -156,7 +157,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			if err := setCellOrError(col+1, summaryRow+i, val); err != nil {
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-				log.Printf("downloadHandler: summary cell error: %v", err)
+				slog.ErrorContext(ctx, "downloadHandler: summary cell error", "error", err)
 				return
 			}
 		}
@@ -164,7 +165,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Set the energy SUM formula in the Total kWh row
 	if err := f.SetCellFormula(sheet, energySumCell, energySumFormula); err != nil {
-		log.Printf("downloadHandler: formula error: %v", err)
+		slog.ErrorContext(ctx, "downloadHandler: formula error", "error", err)
 	}
 
 	filename := fmt.Sprintf("%s ladeabrechnung.xlsx", monthToCalculate)
@@ -172,6 +173,6 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
 	if err := f.Write(w); err != nil {
-		log.Printf("downloadHandler: failed to write xlsx: %v", err)
+		slog.ErrorContext(ctx, "downloadHandler: failed to write xlsx", "error", err)
 	}
 }

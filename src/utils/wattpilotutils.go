@@ -1,10 +1,11 @@
 package wattpilotutils
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"math"
 	"net/http"
 	"net/url"
@@ -15,7 +16,14 @@ import (
 	"sync"
 	"time"
 	_ "time/tzdata"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
+
+var tracer = otel.Tracer("github.com/jetzlstorfer/wattpilot-exporter/utils")
 
 // refreshMu guards RefreshData to prevent concurrent writes to data files.
 var refreshMu sync.Mutex
@@ -74,17 +82,33 @@ func ParseJSON(jsonData []byte) (WattpilotData, error) {
 }
 
 // FetchJSON fetches a JSON document from the specified URL.
-func FetchJSON(url string) ([]byte, error) {
-	response, err := http.Get(url)
+func FetchJSON(ctx context.Context, fetchURL string) ([]byte, error) {
+	ctx, span := tracer.Start(ctx, "FetchJSON")
+	defer span.End()
+
+	span.SetAttributes(attribute.String("url", fetchURL))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchURL, nil)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to fetch JSON: %v", err)
 	}
 	defer response.Body.Close()
 
-	//log.Println("getting json data from url: ", url)
+	span.SetAttributes(attribute.Int("http.status_code", response.StatusCode))
 
 	jsonData, err := io.ReadAll(response.Body)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to read JSON data: %v", err)
 	}
 	return jsonData, nil
@@ -106,36 +130,36 @@ func isDataStale() bool {
 
 // tryAutoRefresh attempts to refresh data if it's stale and WATTPILOT_KEY is set
 // Returns true if a refresh was attempted (regardless of success/failure)
-func tryAutoRefresh() bool {
+func tryAutoRefresh(ctx context.Context) bool {
 	if !isDataStale() {
 		return false // Data is fresh, no need to refresh
 	}
 
 	key := os.Getenv("WATTPILOT_KEY")
 	if key == "" {
-		log.Println("Data is stale but WATTPILOT_KEY not set - skipping auto-refresh")
+		slog.InfoContext(ctx, "Data is stale but WATTPILOT_KEY not set - skipping auto-refresh")
 		return false
 	}
 
-	log.Println("Data is stale, attempting automatic refresh...")
-	err := RefreshData()
+	slog.InfoContext(ctx, "Data is stale, attempting automatic refresh...")
+	err := RefreshData(ctx)
 	if err != nil {
-		log.Printf("Auto-refresh failed: %v (will use cached/backup data)", err)
+		slog.ErrorContext(ctx, "Auto-refresh failed, will use cached/backup data", "error", err)
 		return true // Attempted but failed
 	}
 
-	log.Println("Auto-refresh successful")
+	slog.InfoContext(ctx, "Auto-refresh successful")
 	return true // Attempted and succeeded
 }
 
-func GetJSONData() ([]byte, error) {
+func GetJSONData(ctx context.Context) ([]byte, error) {
 	// Try to auto-refresh if data is stale
-	tryAutoRefresh()
+	tryAutoRefresh(ctx)
 
 	// Read JSON document from file (whether it's fresh or stale)
 	jsonData, err := readJSONFile(JSONFileName)
 	if err != nil {
-		log.Printf("Failed to read JSON file: %v", err)
+		slog.ErrorContext(ctx, "Failed to read JSON file", "error", err)
 		// Don't auto-fetch here anymore - let the caller decide whether to use backup or fetch
 		return nil, err
 	}
@@ -195,7 +219,7 @@ func createMonthlyBackups(allData WattpilotData) error {
 	for _, entry := range allData.Data {
 		month, err := time.Parse("02.01.2006 15:04:05", entry.End)
 		if err != nil {
-			log.Printf("Warning: skipping entry with invalid End time %q: %v", entry.End, err)
+			slog.Warn("Skipping entry with invalid End time", "end", entry.End, "error", err)
 			continue
 		}
 		monthKey := month.Format("2006-01")
@@ -217,7 +241,7 @@ func createMonthlyBackups(allData WattpilotData) error {
 		backupFilename := getMonthlyBackupFilename(monthKey)
 		err = saveJSONFile(backupFilename, backupBytes)
 		if err != nil {
-			log.Printf("Warning: failed to create backup for %s: %v", monthKey, err)
+			slog.Warn("Failed to create backup", "month", monthKey, "error", err)
 			// Don't fail the entire operation if one backup fails
 		}
 	}
@@ -234,7 +258,8 @@ func tryMonthlyBackup(monthYearStr string) ([]byte, error) {
 func PrepUrl(wattpilotDataUrl string, from string, to string, key string) string {
 	myUrl, err := url.Parse(wattpilotDataUrl)
 	if err != nil {
-		log.Fatal(err)
+		// WattpilotDataUrl is a hardcoded constant; a parse failure is a programming error.
+		panic(fmt.Sprintf("wattpilotutils: invalid WattpilotDataUrl constant: %v", err))
 	}
 	values := myUrl.Query()
 	if from == "" || to == "" {
@@ -253,16 +278,19 @@ func GetUnixTimestampStart(yearMonth string) string {
 	// year-month into unix timestamp
 	loc, err := time.LoadLocation("Europe/Berlin")
 	if err != nil {
-		log.Fatal(err)
+		// time/tzdata is embedded; a failure here is a programming error.
+		panic(fmt.Sprintf("wattpilotutils: failed to load timezone Europe/Berlin: %v", err))
 	}
 	t, _ := time.Parse("2006-01", yearMonth)
 	return strconv.FormatInt(t.In(loc).Unix()*1000, 10)
 }
+
 func GetUnixTimestampEnd(yearMonth string) string {
 	// year-month into unix timestamp
 	loc, err := time.LoadLocation("Europe/Berlin")
 	if err != nil {
-		log.Fatal(err)
+		// time/tzdata is embedded; a failure here is a programming error.
+		panic(fmt.Sprintf("wattpilotutils: failed to load timezone Europe/Berlin: %v", err))
 	}
 	t, _ := time.Parse("2006-01", yearMonth)
 
@@ -293,21 +321,29 @@ func GetNextMonth(yearMonth string) string {
 	return t.Format("2006-01")
 }
 
-func GetStatsForMonth(monthToCalculate string) (WattpilotData, error) {
+func GetStatsForMonth(ctx context.Context, monthToCalculate string) (WattpilotData, error) {
+	ctx, span := tracer.Start(ctx, "GetStatsForMonth",
+		oteltrace.WithAttributes(attribute.String("month", monthToCalculate)),
+	)
+	defer span.End()
+
 	// Try to get data from the main JSON file
-	jsonData, err := GetJSONData()
+	slog.InfoContext(ctx, "Loading stats for month", "month", monthToCalculate)
+	jsonData, err := GetJSONData(ctx)
 	usedMainFile := err == nil
 
 	// If main file doesn't exist or is corrupted, try monthly backup
 	if err != nil {
-		log.Printf("Main data file unavailable for %s, trying backup: %v", monthToCalculate, err)
+		slog.WarnContext(ctx, "Main data file unavailable, trying backup", "month", monthToCalculate, "error", err)
 		backupData, backupErr := tryMonthlyBackup(monthToCalculate)
 		if backupErr != nil {
 			// Both main and backup failed
+			span.RecordError(backupErr)
+			span.SetStatus(codes.Error, "main and backup data unavailable")
 			return WattpilotData{}, fmt.Errorf("failed to fetch JSON from main file and backup: main=%v, backup=%v", err, backupErr)
 		}
 		jsonData = backupData
-		log.Printf("Using backup data for month %s", monthToCalculate)
+		slog.InfoContext(ctx, "Using backup data for month", "month", monthToCalculate)
 	}
 
 	// Parse JSON document
@@ -315,17 +351,23 @@ func GetStatsForMonth(monthToCalculate string) (WattpilotData, error) {
 	if err != nil {
 		// Main parsing failed, try backup if we were using the main file
 		if usedMainFile {
-			log.Printf("Failed to parse main JSON: %v, trying backup", err)
+			slog.WarnContext(ctx, "Failed to parse main JSON, trying backup", "error", err)
 			backupData, backupErr := tryMonthlyBackup(monthToCalculate)
 			if backupErr != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
 				return WattpilotData{}, fmt.Errorf("failed to parse JSON: %v", err)
 			}
 			parsedData, err = ParseJSON(backupData)
 			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
 				return WattpilotData{}, fmt.Errorf("failed to parse backup JSON: %v", err)
 			}
-			log.Printf("Using backup data for month %s after parse failure", monthToCalculate)
+			slog.InfoContext(ctx, "Using backup data for month after parse failure", "month", monthToCalculate)
 		} else {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return WattpilotData{}, fmt.Errorf("failed to parse JSON: %v", err)
 		}
 	}
@@ -346,14 +388,22 @@ func GetStatsForMonth(monthToCalculate string) (WattpilotData, error) {
 	}
 
 	monthlyData.Data = newData
+	span.SetAttributes(attribute.Int("session.count", len(newData)))
 	return monthlyData, nil
 }
 
-func GetStatsForMonths(months []string) ([]WattpilotData, error) {
+func GetStatsForMonths(ctx context.Context, months []string) ([]WattpilotData, error) {
+	ctx, span := tracer.Start(ctx, "GetStatsForMonths",
+		oteltrace.WithAttributes(attribute.Int("month.count", len(months))),
+	)
+	defer span.End()
+
 	var data []WattpilotData
 	for _, month := range months {
-		monthData, err := GetStatsForMonth(strings.TrimSpace(month))
+		monthData, err := GetStatsForMonth(ctx, strings.TrimSpace(month))
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			// Return the data collected so far and the error
 			return data, fmt.Errorf("failed to get stats for month %s: %v", month, err)
 		}
@@ -426,7 +476,10 @@ func CalculatePriceMargin(endTime string, energy float64, eco float64) float64 {
 	}
 }
 
-func RefreshData() error {
+func RefreshData(ctx context.Context) error {
+	ctx, span := tracer.Start(ctx, "RefreshData")
+	defer span.End()
+
 	refreshMu.Lock()
 	defer refreshMu.Unlock()
 
@@ -434,26 +487,35 @@ func RefreshData() error {
 
 	// Validate that we have a WATTPILOT_KEY before attempting to fetch
 	if key == "" {
-		return fmt.Errorf("WATTPILOT_KEY environment variable is not set - cannot fetch data from API")
+		err := fmt.Errorf("WATTPILOT_KEY environment variable is not set - cannot fetch data from API")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
 	}
 
 	myUrl := PrepUrl(WattpilotDataUrl, "", "", key)
 
 	// Fetch JSON document from the web
-	jsonData, err := FetchJSON(myUrl)
+	jsonData, err := FetchJSON(ctx, myUrl)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("failed to fetch JSON from API: %v", err)
 	}
 
 	// Parse the data to validate it before saving
 	parsedData, err := ParseJSON(jsonData)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("failed to parse fetched JSON: %v", err)
 	}
 
 	// Save JSON document to main file
 	err = saveJSONFile(JSONFileName, jsonData)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("failed to save JSON file: %v", err)
 	}
 
@@ -461,11 +523,11 @@ func RefreshData() error {
 	err = createMonthlyBackups(parsedData)
 	if err != nil {
 		// Log the error but don't fail - we successfully saved the main file
-		log.Printf("Warning: failed to create some backups: %v", err)
+		slog.WarnContext(ctx, "Failed to create some backups", "error", err)
 	} else {
-		log.Println("Successfully created monthly backups")
+		slog.InfoContext(ctx, "Successfully created monthly backups")
 	}
 
-	log.Println("Data refreshed successfully")
+	slog.InfoContext(ctx, "Data refreshed successfully")
 	return nil
 }
