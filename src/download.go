@@ -50,6 +50,9 @@ func getEntryValue(key string, entry wattpilotutils.WattpilotEntry) interface{} 
 }
 
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireKey(w, r) {
+		return
+	}
 	date := r.URL.Query().Get("date")
 
 	monthToCalculate := time.Now().Format("2006-01")

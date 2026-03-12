@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>Settings – Wattpilot Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#059669">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Wattpilot">
+    <link rel="stylesheet" href="/static/tailwind.css">
+    <link rel="stylesheet" href="/static/dashboard.css">
+    <script>
+        (function () {
+            const stored = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (stored === 'dark' || (!stored && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen antialiased">
+
+    <!-- Navigation -->
+    <nav class="sticky top-0 z-50 bg-gray-950/80 backdrop-blur-xl border-b border-white/5 px-6 py-4">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <a href="/" class="flex items-center gap-3 group">
+                <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-lg shadow-lg group-hover:bg-blue-500 transition-colors">⚡</div>
+                <span class="text-lg font-bold text-white tracking-tight">Wattpilot</span>
+            </a>
+            <div class="flex items-center gap-1" style="position: relative;">
+                <div class="nav-links" id="navLinks">
+                    <a href="/" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Dashboard</a>
+                    <a href="/charts" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Charts</a>
+                    <a href="/info" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Info</a>
+                    <a href="/config" class="px-4 py-2 rounded-xl text-sm font-medium bg-white/10 text-white">Settings</a>
+                    <button id="themeToggle" type="button" class="px-3 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all" aria-label="Toggle theme">🌙</button>
+                </div>
+                <button id="hamburger" type="button" class="hamburger px-3 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="navLinks">☰</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-2xl mx-auto px-6 py-16">
+
+        <!-- Hero -->
+        <div class="text-center mb-12">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-blue-600/20 border border-blue-500/30 rounded-3xl text-4xl mb-6">⚙️</div>
+            <h1 class="text-4xl font-extrabold text-white tracking-tight mb-3">Settings</h1>
+            <p class="text-gray-400 leading-relaxed">
+                Configure your Wattpilot API key. The key is stored server-side in <code class="text-blue-400 bg-blue-950/50 px-1 rounded">config.json</code> and never sent to your browser.
+            </p>
+        </div>
+
+        {{if .Error}}
+        <div class="mb-6 flex items-start gap-3 bg-red-500/10 border border-red-500/30 text-red-300 rounded-2xl px-5 py-4 text-sm">
+            <span class="mt-0.5 text-base">⚠️</span>
+            <span>{{.Error}}</span>
+        </div>
+        {{end}}
+
+        <!-- Key status banner -->
+        {{if .KeySet}}
+        <div class="mb-6 flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-2xl px-5 py-4 text-sm">
+            <span class="text-base">✅</span>
+            <span>An API key is currently configured. Enter a new value below to replace it.</span>
+        </div>
+        {{else}}
+        <div class="mb-6 flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-2xl px-5 py-4 text-sm">
+            <span class="text-base">🔑</span>
+            <span>No API key is set yet. Add your Wattpilot key below to get started.</span>
+        </div>
+        {{end}}
+
+        <!-- Config form -->
+        <div class="bg-white/5 border border-white/10 rounded-2xl p-8">
+            <form method="POST" action="/config" autocomplete="off">
+                <div class="mb-6">
+                    <label for="wattpilot_key" class="block text-sm font-semibold text-gray-300 mb-2">Wattpilot API Key</label>
+                    <p class="text-xs text-gray-500 mb-3">
+                        Find your key in the Wattpilot export URL — it's the value of the <code class="text-blue-400 bg-blue-950/50 px-1 rounded">?e=</code> query parameter.
+                    </p>
+                    <input
+                        type="password"
+                        id="wattpilot_key"
+                        name="wattpilot_key"
+                        placeholder="Paste your API key here…"
+                        autocomplete="new-password"
+                        class="w-full bg-gray-900 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-mono transition-all"
+                        required
+                    >
+                    <div class="mt-2 flex items-center gap-2">
+                        <input type="checkbox" id="showKey" class="rounded" aria-label="Toggle API key visibility" onchange="document.getElementById('wattpilot_key').type = this.checked ? 'text' : 'password'">
+                        <label for="showKey" class="text-xs text-gray-500 cursor-pointer select-none">Show key</label>
+                    </div>
+                </div>
+
+                <button
+                    type="submit"
+                    class="w-full py-3 px-6 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-lg shadow-blue-900/30 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                    Save &amp; Continue →
+                </button>
+            </form>
+        </div>
+
+        <!-- Security note -->
+        <div class="mt-8 bg-white/3 border border-white/5 rounded-2xl px-6 py-5">
+            <h2 class="text-sm font-semibold text-gray-300 mb-3">🔒 How the key is stored</h2>
+            <ul class="text-sm text-gray-400 space-y-2 list-none">
+                <li>• Saved to <code class="text-blue-400 bg-blue-950/50 px-1 rounded">config.json</code> on the server — never in your browser or a cookie.</li>
+                <li>• Only the server process can read this file.</li>
+                <li>• The key is only used server-side to fetch data from the Wattpilot API.</li>
+                <li>• The <code class="text-blue-400 bg-blue-950/50 px-1 rounded">WATTPILOT_KEY</code> environment variable still works as a fallback.</li>
+            </ul>
+        </div>
+
+    </main>
+
+    <script src="/static/theme.js"></script>
+
+    <script>
+    (function() {
+        const hamburger = document.getElementById('hamburger');
+        const navLinks = document.getElementById('navLinks');
+        if (!hamburger || !navLinks) return;
+        hamburger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const isOpen = navLinks.classList.toggle('open');
+            hamburger.setAttribute('aria-expanded', String(isOpen));
+        });
+        document.addEventListener('click', function(e) {
+            if (!hamburger.contains(e.target) && !navLinks.contains(e.target)) {
+                navLinks.classList.remove('open');
+                hamburger.setAttribute('aria-expanded', 'false');
+            }
+        });
+    })();
+    </script>
+
+</body>
+</html>

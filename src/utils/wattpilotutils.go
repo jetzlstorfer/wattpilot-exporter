@@ -27,8 +27,59 @@ const PurchasePricePerKwh2024 = 0.2824
 const PurchasePricePerKwh2025 = 0.25
 const PurchasePricePerKwh2026 = 0.25
 const JSONFileName = "data.json"
+const ConfigFileName = "config.json"
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 const DataTTLMinutes = 60 // Auto-refresh data if older than this many minutes
+
+// AppConfig holds application configuration persisted to config.json.
+type AppConfig struct {
+	WattpilotKey string `json:"wattpilot_key"`
+}
+
+// LoadAppConfig reads the configuration from config.json.
+// Returns an empty config (not an error) if the file does not exist yet.
+func LoadAppConfig() (AppConfig, error) {
+	data, err := os.ReadFile(ConfigFileName)
+	if os.IsNotExist(err) {
+		return AppConfig{}, nil
+	}
+	if err != nil {
+		return AppConfig{}, fmt.Errorf("failed to read config file: %v", err)
+	}
+	var cfg AppConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return AppConfig{}, fmt.Errorf("failed to parse config file: %v", err)
+	}
+	return cfg, nil
+}
+
+// SaveAppConfig writes the given key to config.json atomically.
+func SaveAppConfig(key string) error {
+	cfg := AppConfig{WattpilotKey: key}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %v", err)
+	}
+	tmp := ConfigFileName + ".tmp"
+	// 0600 restricts access to the owner on Unix/Linux; Windows ignores this permission.
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
+		return fmt.Errorf("failed to write config file: %v", err)
+	}
+	if err := os.Rename(tmp, ConfigFileName); err != nil {
+		return fmt.Errorf("failed to save config file: %v", err)
+	}
+	return nil
+}
+
+// GetWattpilotKey returns the API key, preferring the value stored in
+// config.json and falling back to the WATTPILOT_KEY environment variable.
+func GetWattpilotKey() string {
+	cfg, err := LoadAppConfig()
+	if err == nil && cfg.WattpilotKey != "" {
+		return cfg.WattpilotKey
+	}
+	return os.Getenv("WATTPILOT_KEY")
+}
 
 type WattpilotColumn struct {
 	Key       string `json:"key"`
@@ -111,7 +162,7 @@ func tryAutoRefresh() bool {
 		return false // Data is fresh, no need to refresh
 	}
 
-	key := os.Getenv("WATTPILOT_KEY")
+	key := GetWattpilotKey()
 	if key == "" {
 		log.Println("Data is stale but WATTPILOT_KEY not set - skipping auto-refresh")
 		return false
@@ -430,11 +481,11 @@ func RefreshData() error {
 	refreshMu.Lock()
 	defer refreshMu.Unlock()
 
-	key := os.Getenv("WATTPILOT_KEY")
+	key := GetWattpilotKey()
 
 	// Validate that we have a WATTPILOT_KEY before attempting to fetch
 	if key == "" {
-		return fmt.Errorf("WATTPILOT_KEY environment variable is not set - cannot fetch data from API")
+		return fmt.Errorf("WATTPILOT_KEY is not configured - use the /config page to set it")
 	}
 
 	myUrl := PrepUrl(WattpilotDataUrl, "", "", key)

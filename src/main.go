@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
@@ -29,6 +30,59 @@ type Data struct {
 	TotalMargin      float64
 	Sessions         []SessionPoint
 	Error            string
+}
+
+type ConfigData struct {
+	KeySet  bool
+	Message string
+	Error   string
+}
+
+// requireKey redirects to /config if no API key is configured and returns false.
+// Returns true when a key is available and the handler may proceed.
+func requireKey(w http.ResponseWriter, r *http.Request) bool {
+	if wattpilotutils.GetWattpilotKey() == "" {
+		http.Redirect(w, r, "/config", http.StatusSeeOther)
+		return false
+	}
+	return true
+}
+
+func configHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := template.ParseFiles("config.html")
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		log.Printf("configHandler: template parse error: %v", err)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		if err := r.ParseForm(); err != nil {
+			tmpl.Execute(w, ConfigData{Error: "Failed to read form data."})
+			return
+		}
+		key := strings.TrimSpace(r.FormValue("wattpilot_key"))
+		if key == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			tmpl.Execute(w, ConfigData{Error: "Key must not be empty."})
+			return
+		}
+		if err := wattpilotutils.SaveAppConfig(key); err != nil {
+			log.Printf("configHandler: failed to save config: %v", err)
+			tmpl.Execute(w, ConfigData{Error: "Failed to save configuration. Check server logs."})
+			return
+		}
+		log.Println("WATTPILOT_KEY saved via config page")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	// GET – show current status
+	cfg, err := wattpilotutils.LoadAppConfig()
+	if err != nil {
+		log.Printf("configHandler: failed to load config: %v", err)
+	}
+	tmpl.Execute(w, ConfigData{KeySet: cfg.WattpilotKey != ""})
 }
 
 func calculateData(date string) (Data, error) {
@@ -128,6 +182,9 @@ func infoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireKey(w, r) {
+		return
+	}
 	date := r.URL.Query().Get("date")
 	data, err := calculateData(date)
 	if err != nil {
@@ -158,6 +215,9 @@ func faviconSVGHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func refreshHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireKey(w, r) {
+		return
+	}
 	// refresh data
 	err := wattpilotutils.RefreshData()
 	if err != nil {
@@ -187,6 +247,7 @@ func main() {
 	http.HandleFunc("/charts", chartHandler)
 	http.HandleFunc("/info", infoHandler)
 	http.HandleFunc("/download", downloadHandler)
+	http.HandleFunc("/config", configHandler)
 	log.Println("Starting server on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
