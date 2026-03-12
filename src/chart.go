@@ -2,7 +2,7 @@ package main
 
 import (
 	"html/template"
-	"log"
+	"log/slog"
 	"net/http"
 
 	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
@@ -20,7 +20,9 @@ type ChartsData struct {
 	Months []MonthStat
 }
 
-func chartHandler(w http.ResponseWriter, _ *http.Request) {
+func chartHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	// generate all months since June 2024
 	firstMonthWithData := "2024-06"
 	months := []string{firstMonthWithData}
@@ -29,18 +31,18 @@ func chartHandler(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	// get data from wattpilot
-	data, err := wattpilotutils.GetStatsForMonths(months)
+	data, err := wattpilotutils.GetStatsForMonths(ctx, months)
 	if err != nil {
 		// Log the error but still render the page with a message
-		log.Printf("chartHandler: failed to get stats: %v", err)
+		slog.ErrorContext(ctx, "chartHandler: failed to get stats", "error", err)
 		tmpl, tmplErr := template.ParseFiles("charts.html")
 		if tmplErr != nil {
-			log.Printf("chartHandler: template parse error in error path: %v", tmplErr)
+			slog.ErrorContext(ctx, "chartHandler: template parse error in error path", "error", tmplErr)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
 		if execErr := tmpl.Execute(w, ChartsData{Months: []MonthStat{}}); execErr != nil {
-			log.Printf("chartHandler: template execute error in error path: %v", execErr)
+			slog.ErrorContext(ctx, "chartHandler: template execute error in error path", "error", execErr)
 		}
 		return
 	}
@@ -68,10 +70,10 @@ func chartHandler(w http.ResponseWriter, _ *http.Request) {
 	tmpl, err := template.ParseFiles("charts.html")
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		log.Printf("chartHandler: template parse error: %v", err)
+		slog.ErrorContext(ctx, "chartHandler: template parse error", "error", err)
 		return
 	}
 	if err := tmpl.Execute(w, ChartsData{Months: monthStats}); err != nil {
-		log.Printf("chartHandler: template execute error: %v", err)
+		slog.ErrorContext(ctx, "chartHandler: template execute error", "error", err)
 	}
 }
