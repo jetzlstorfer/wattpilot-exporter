@@ -258,8 +258,8 @@ func tryMonthlyBackup(monthYearStr string) ([]byte, error) {
 func PrepUrl(wattpilotDataUrl string, from string, to string, key string) string {
 	myUrl, err := url.Parse(wattpilotDataUrl)
 	if err != nil {
-		slog.Error("Failed to parse URL", "error", err)
-		return ""
+		// WattpilotDataUrl is a hardcoded constant; a parse failure is a programming error.
+		panic(fmt.Sprintf("wattpilotutils: invalid WattpilotDataUrl constant: %v", err))
 	}
 	values := myUrl.Query()
 	if from == "" || to == "" {
@@ -278,18 +278,19 @@ func GetUnixTimestampStart(yearMonth string) string {
 	// year-month into unix timestamp
 	loc, err := time.LoadLocation("Europe/Berlin")
 	if err != nil {
-		slog.Error("Failed to load timezone", "error", err)
-		return ""
+		// time/tzdata is embedded; a failure here is a programming error.
+		panic(fmt.Sprintf("wattpilotutils: failed to load timezone Europe/Berlin: %v", err))
 	}
 	t, _ := time.Parse("2006-01", yearMonth)
 	return strconv.FormatInt(t.In(loc).Unix()*1000, 10)
 }
+
 func GetUnixTimestampEnd(yearMonth string) string {
 	// year-month into unix timestamp
 	loc, err := time.LoadLocation("Europe/Berlin")
 	if err != nil {
-		slog.Error("Failed to load timezone", "error", err)
-		return ""
+		// time/tzdata is embedded; a failure here is a programming error.
+		panic(fmt.Sprintf("wattpilotutils: failed to load timezone Europe/Berlin: %v", err))
 	}
 	t, _ := time.Parse("2006-01", yearMonth)
 
