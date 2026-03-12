@@ -328,6 +328,7 @@ func GetStatsForMonth(ctx context.Context, monthToCalculate string) (WattpilotDa
 	defer span.End()
 
 	// Try to get data from the main JSON file
+	slog.InfoContext(ctx, "Loading stats for month", "month", monthToCalculate)
 	jsonData, err := GetJSONData(ctx)
 	usedMainFile := err == nil
 

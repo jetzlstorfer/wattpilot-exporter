@@ -9,7 +9,6 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/propagation"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
@@ -77,25 +76,25 @@ func initTelemetry(ctx context.Context) (shutdown func(context.Context) error, e
 }
 
 func newTracerProvider(ctx context.Context, res *resource.Resource) (*sdktrace.TracerProvider, error) {
-	var exporter sdktrace.SpanExporter
-	var err error
-
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
-		exporter, err = otlptracehttp.New(ctx)
+		exporter, err := otlptracehttp.New(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)
 		}
-	} else {
-		exporter, err = stdouttrace.New(stdouttrace.WithPrettyPrint())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create stdout trace exporter: %w", err)
-		}
+
+		tp := sdktrace.NewTracerProvider(
+			sdktrace.WithBatcher(exporter),
+			sdktrace.WithResource(res),
+			sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		)
+		return tp, nil
 	}
 
+	// Local default: keep tracing API enabled but disable span export/sampling
+	// to avoid noisy stdout output while still emitting structured logs.
 	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
 		sdktrace.WithResource(res),
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		sdktrace.WithSampler(sdktrace.NeverSample()),
 	)
 	return tp, nil
 }
