@@ -1,6 +1,6 @@
 # Wattpilot Data Exporter ⚡
 
-A lightweight Go web application that fetches EV charging session data from [Fronius Wattpilot](https://www.fronius.com/en/solar-energy/installers-partners/products-solutions/e-mobility/wattpilot) and calculates monthly charging costs based on the official Austrian government electricity rates ([BMF Sachbezug](https://www.bmf.gv.at/themen/steuern/arbeitnehmerveranlagung/pendlerfoerderung-das-pendlerpauschale/sachbezug-kraftfahrzeug.html)).
+A lightweight Go web application that fetches EV charging session data from [Fronius Wattpilot](https://www.fronius.com/en/solar-energy/installers-partners/products-solutions/e-mobility/wattpilot) and calculates monthly charging costs based on the official Austrian government electricity rates ([BMF Sachbezug](https://www.bmf.gv.at/themen/steuern/arbeitnehmerinnenveranlagung/pendlerfoerderung-das-pendlerpauschale/sachbezug-kraftfahrzeug.html)).
 
 ## Features
 
@@ -10,8 +10,6 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 - **Live charging indicator** — detects whether a charging session is currently active
 - **Data caching** — fetched data is cached locally as `data.json`; use the `/refresh` endpoint to re-fetch
 - **Docker support** — multi-stage Docker build for minimal container images
-
-![Dashboard Screenshot](./assets//dashboard-screenshot.png)
 
 ## Prerequisites
 
@@ -65,44 +63,6 @@ make docker-run
 ```
 
 > Make sure a `.env` file with your `WATTPILOT_KEY` exists in `src/` — it is passed to the container via `--env-file`.
-
-### Deploy to Azure
-
-This project is configured for deployment to **Azure Container Apps** using the **Azure Developer CLI (azd)**.
-
-**Prerequisites:**
-- [Azure Developer CLI (`azd`)](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/)
-- [Azure CLI (`az`)](https://learn.microsoft.com/en-us/cli/azure/)
-- An Azure subscription
-- Docker Hub account with push credentials
-
-**Quick start:**
-
-```bash
-# Login to Azure
-azd auth login
-
-# Initialize environment (from repo root)
-azd init -e wattpilot-prod
-
-# Configure
-azd env set AZURE_LOCATION swedencentral
-azd env set WATTPILOT_KEY <your-wattpilot-api-key>
-azd env set DOCKER_USERNAME <your-dockerhub-username>
-azd env set DOCKER_PASSWORD <your-dockerhub-password>
-azd env set CONTAINER_IMAGE jetzlstorfer/wattpilot-export:latest
-
-# Provision infrastructure
-azd provision
-
-# Deploy application
-azd deploy
-
-# Get the deployed URL
-azd env get-values | grep AZURE_CONTAINER_APP_FQDN
-```
-
-See [AZD-SETUP.md](AZD-SETUP.md) for detailed Azure deployment instructions.
 
 ## Routes
 
