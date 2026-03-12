@@ -31,8 +31,7 @@ const serviceName = "wattpilot-exporter"
 func initTelemetry(ctx context.Context) (shutdown func(context.Context) error, err error) {
 	res, err := resource.Merge(
 		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
+		resource.NewSchemaless(
 			semconv.ServiceName(serviceName),
 		),
 	)
