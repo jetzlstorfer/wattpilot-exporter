@@ -1,192 +1,220 @@
 package main
 
 import (
-	"html/template"
-	"log"
-	"net/http"
-	"time"
+"context"
+"fmt"
+"html/template"
+"net/http"
+"os"
+"time"
 
-	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
-	"github.com/joho/godotenv"
+"github.com/jetzlstorfer/wattpilot-exporter/telemetry"
+wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
+"github.com/joho/godotenv"
+"go.opentelemetry.io/otel/attribute"
 )
 
 type SessionPoint struct {
-	EndTime string
-	Energy  float64
-	Price   float64
+EndTime string
+Energy  float64
+Price   float64
 }
 
 type Data struct {
-	Date             string
-	FormattedDate    string
-	PrevMonth        string
-	NextMonth        string
-	ChargingSessions int
-	LatestSession    string
-	IsCharging       bool
-	TotalEnergy      float64
-	TotalPrice       float64
-	TotalMargin      float64
-	Sessions         []SessionPoint
-	Error            string
+Date             string
+FormattedDate    string
+PrevMonth        string
+NextMonth        string
+ChargingSessions int
+LatestSession    string
+IsCharging       bool
+TotalEnergy      float64
+TotalPrice       float64
+TotalMargin      float64
+Sessions         []SessionPoint
+Error            string
 }
 
-func calculateData(date string) (Data, error) {
+func calculateData(ctx context.Context, date string) (Data, error) {
 
-	monthToCalculate := time.Now().Format("2006-01")
-	if date != "" {
-		monthToCalculate = date
-	}
+monthToCalculate := time.Now().Format("2006-01")
+if date != "" {
+monthToCalculate = date
+}
 
-	// Parse and format the date for display
-	parsedTime, err := time.Parse("2006-01", monthToCalculate)
-	if err != nil {
-		log.Printf("Invalid date parameter %q: %v", monthToCalculate, err)
-		return Data{
-			Date:          monthToCalculate,
-			FormattedDate: "Invalid date",
-			PrevMonth:     "",
-			NextMonth:     "",
-			Error:         "The requested month is invalid. Please use format YYYY-MM.",
-		}, nil
-	}
-	formattedDate := parsedTime.Format("January 2006")
+// Parse and format the date for display
+parsedTime, err := time.Parse("2006-01", monthToCalculate)
+if err != nil {
+telemetry.Errorf("Invalid date parameter %q: %v", monthToCalculate, err)
+return Data{
+Date:          monthToCalculate,
+FormattedDate: "Invalid date",
+PrevMonth:     "",
+NextMonth:     "",
+Error:         "The requested month is invalid. Please use format YYYY-MM.",
+}, nil
+}
+formattedDate := parsedTime.Format("January 2006")
 
-	parsedData, err := wattpilotutils.GetStatsForMonth(monthToCalculate)
+ctx, span := telemetry.StartSpan(ctx, "calculateData", attribute.String("month", monthToCalculate))
+defer span.End()
 
-	// Return data with error message if fetch/parse failed
-	if err != nil {
-		log.Printf("Error fetching data: %v", err)
-		return Data{
-			Date:          monthToCalculate,
-			FormattedDate: formattedDate,
-			PrevMonth:     wattpilotutils.GetPrevMonth(monthToCalculate),
-			NextMonth:     wattpilotutils.GetNextMonth(monthToCalculate),
-			Error:         "Unable to fetch charging data. Please try refreshing or check back later.",
-		}, nil
-	}
+parsedData, err := wattpilotutils.GetStatsForMonth(monthToCalculate)
 
-	// Calculate total energy & price
-	totalEnergy := 0.0
-	totalPrice := 0.0
-	totalMargin := 0.0
-	latestSession := ""
+// Return data with error message if fetch/parse failed
+if err != nil {
+telemetry.Errorf("Error fetching data: %v", err)
+return Data{
+Date:          monthToCalculate,
+FormattedDate: formattedDate,
+PrevMonth:     wattpilotutils.GetPrevMonth(monthToCalculate),
+NextMonth:     wattpilotutils.GetNextMonth(monthToCalculate),
+Error:         "Unable to fetch charging data. Please try refreshing or check back later.",
+}, nil
+}
 
-	var sessions []SessionPoint
+// Calculate total energy & price
+totalEnergy := 0.0
+totalPrice := 0.0
+totalMargin := 0.0
+latestSession := ""
 
-	// loop over the data
-	for _, data := range parsedData.Data {
-		totalEnergy += data.Energy
-		price := wattpilotutils.CalculatePrice(data.End, data.Energy, 100)
-		totalPrice += price
-		totalMargin += wattpilotutils.CalculatePriceMargin(data.End, data.Energy, data.Eco)
-		latestSession = data.End
-		sessions = append(sessions, SessionPoint{
-			EndTime: data.End,
-			Energy:  wattpilotutils.RoundFloat(data.Energy, 2),
-			Price:   wattpilotutils.RoundFloat(price, 2),
-		})
-	}
-	activeSession := false
-	loc, _ := time.LoadLocation("Europe/Berlin")
-	latestSessionTimeStamp, _ := time.Parse(time.DateTime, latestSession)
-	latestSessionTimeStamp = latestSessionTimeStamp.Add(-2 * time.Hour) // fix for timezone
+var sessions []SessionPoint
 
-	if latestSessionTimeStamp.Add(1 * time.Minute).After(time.Now().In(loc)) {
-		// session is active
-		activeSession = true
-	}
+// loop over the data
+for _, data := range parsedData.Data {
+totalEnergy += data.Energy
+price := wattpilotutils.CalculatePrice(data.End, data.Energy, 100)
+totalPrice += price
+totalMargin += wattpilotutils.CalculatePriceMargin(data.End, data.Energy, data.Eco)
+latestSession = data.End
+sessions = append(sessions, SessionPoint{
+EndTime: data.End,
+Energy:  wattpilotutils.RoundFloat(data.Energy, 2),
+Price:   wattpilotutils.RoundFloat(price, 2),
+})
+}
+activeSession := false
+loc, _ := time.LoadLocation("Europe/Berlin")
+latestSessionTimeStamp, _ := time.Parse(time.DateTime, latestSession)
+latestSessionTimeStamp = latestSessionTimeStamp.Add(-2 * time.Hour) // fix for timezone
 
-	// fmt.Println("Total Energy in kWh:", totalEnergy)
-	// fmt.Println("Total Energy in €:", totalPrice)
+if latestSessionTimeStamp.Add(1 * time.Minute).After(time.Now().In(loc)) {
+// session is active
+activeSession = true
+}
 
-	return Data{
-		Date:             monthToCalculate,
-		FormattedDate:    formattedDate,
-		PrevMonth:        wattpilotutils.GetPrevMonth(monthToCalculate),
-		NextMonth:        wattpilotutils.GetNextMonth(monthToCalculate),
-		ChargingSessions: len(parsedData.Data),
-		LatestSession:    latestSession,
-		IsCharging:       activeSession,
-		TotalEnergy:      totalEnergy,
-		TotalPrice:       totalPrice,
-		TotalMargin:      totalMargin,
-		Sessions:         sessions}, nil
+return Data{
+Date:             monthToCalculate,
+FormattedDate:    formattedDate,
+PrevMonth:        wattpilotutils.GetPrevMonth(monthToCalculate),
+NextMonth:        wattpilotutils.GetNextMonth(monthToCalculate),
+ChargingSessions: len(parsedData.Data),
+LatestSession:    latestSession,
+IsCharging:       activeSession,
+TotalEnergy:      totalEnergy,
+TotalPrice:       totalPrice,
+TotalMargin:      totalMargin,
+Sessions:         sessions}, nil
 
 }
 
 func infoHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles("info.html")
-	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		log.Printf("infoHandler: template parse error: %v", err)
-		return
-	}
-	if err := tmpl.Execute(w, nil); err != nil {
-		log.Printf("infoHandler: template execute error: %v", err)
-	}
+_, span := telemetry.StartSpan(r.Context(), "infoHandler")
+defer span.End()
+
+tmpl, err := template.ParseFiles("info.html")
+if err != nil {
+http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+telemetry.Errorf("infoHandler: template parse error: %v", err)
+return
+}
+if err := tmpl.Execute(w, nil); err != nil {
+telemetry.Errorf("infoHandler: template execute error: %v", err)
+}
 }
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
-	date := r.URL.Query().Get("date")
-	data, err := calculateData(date)
-	if err != nil {
-		// Still show the UI even if there's an error in calculateData
-		// (though calculateData now returns nil errors and embeds error message in data)
-		log.Printf("mainHandler: error calculating data: %v", err)
-	}
+ctx := r.Context()
+date := r.URL.Query().Get("date")
+ctx, span := telemetry.StartSpan(ctx, "mainHandler", attribute.String("query.date", date))
+defer span.End()
 
-	tmpl, err := template.ParseFiles("template.html")
-	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		log.Printf("mainHandler: template parse error: %v", err)
-		return
-	}
-	if err := tmpl.Execute(w, data); err != nil {
-		log.Printf("mainHandler: template execute error: %v", err)
-	}
+data, err := calculateData(ctx, date)
+if err != nil {
+// Still show the UI even if there's an error in calculateData
+// (though calculateData now returns nil errors and embeds error message in data)
+telemetry.Errorf("mainHandler: error calculating data: %v", err)
+}
+
+tmpl, err := template.ParseFiles("template.html")
+if err != nil {
+http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+telemetry.Errorf("mainHandler: template parse error: %v", err)
+return
+}
+if err := tmpl.Execute(w, data); err != nil {
+telemetry.Errorf("mainHandler: template execute error: %v", err)
+}
 }
 
 func faviconHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "image/x-icon")
-	http.ServeFile(w, r, "favicon.ico")
+_, span := telemetry.StartSpan(r.Context(), "faviconHandler")
+defer span.End()
+
+w.Header().Set("Content-Type", "image/x-icon")
+http.ServeFile(w, r, "favicon.ico")
 }
 
 func faviconSVGHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "image/svg+xml")
-	http.ServeFile(w, r, "favicon.svg")
+_, span := telemetry.StartSpan(r.Context(), "faviconSVGHandler")
+defer span.End()
+
+w.Header().Set("Content-Type", "image/svg+xml")
+http.ServeFile(w, r, "favicon.svg")
 }
 
 func refreshHandler(w http.ResponseWriter, r *http.Request) {
-	// refresh data
-	err := wattpilotutils.RefreshData()
-	if err != nil {
-		log.Printf("refreshHandler: failed to refresh data: %v", err)
-		http.Error(w, "Failed to refresh data. Please try again later.", http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+ctx, span := telemetry.StartSpan(r.Context(), "refreshHandler")
+defer span.End()
+
+// refresh data
+err := wattpilotutils.RefreshData(ctx)
+if err != nil {
+telemetry.Errorf("refreshHandler: failed to refresh data: %v", err)
+http.Error(w, "Failed to refresh data. Please try again later.", http.StatusInternalServerError)
+return
+}
+http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func main() {
+ctx := context.Background()
+if err := telemetry.Init(ctx); err != nil {
+fmt.Fprintf(os.Stderr, "failed to initialize telemetry logger: %v\n", err)
+os.Exit(1)
+}
+defer telemetry.Shutdown(ctx)
 
-	// get env variables from .env file
-	// Using Overload() instead of Load() to ensure .env always takes precedence
-	// over any pre-existing environment variables (e.g. empty WATTPILOT_KEY in shell)
-	err := godotenv.Overload()
-	if err != nil {
-		//log.Fatal("Error loading .env file")
-		log.Println("Error loading .env file: " + err.Error())
-	}
+// get env variables from .env file
+// Using Overload() instead of Load() to ensure .env always takes precedence
+// over any pre-existing environment variables (e.g. empty WATTPILOT_KEY in shell)
+err := godotenv.Overload()
+if err != nil {
+//log.Fatal("Error loading .env file")
+telemetry.Errorf("Error loading .env file: %v", err)
+}
 
-	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
-	http.HandleFunc("/", mainHandler)
-	http.HandleFunc("/favicon.ico", faviconHandler)
-	http.HandleFunc("/favicon.svg", faviconSVGHandler)
-	http.HandleFunc("/refresh", refreshHandler)
-	http.HandleFunc("/charts", chartHandler)
-	http.HandleFunc("/info", infoHandler)
-	http.HandleFunc("/download", downloadHandler)
-	log.Println("Starting server on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+http.HandleFunc("/", mainHandler)
+http.HandleFunc("/favicon.ico", faviconHandler)
+http.HandleFunc("/favicon.svg", faviconSVGHandler)
+http.HandleFunc("/refresh", refreshHandler)
+http.HandleFunc("/charts", chartHandler)
+http.HandleFunc("/info", infoHandler)
+http.HandleFunc("/download", downloadHandler)
+telemetry.Infof("Starting server on :8080")
+if err := http.ListenAndServe(":8080", nil); err != nil {
+telemetry.Fatalf("server failed: %v", err)
+}
 }
