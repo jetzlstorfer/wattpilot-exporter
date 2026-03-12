@@ -9,6 +9,7 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 - **Excel export** — download a per-month `.xlsx` billing report with detailed session data and cost summary
 - **Live charging indicator** — detects whether a charging session is currently active
 - **Data caching** — fetched data is cached locally as `data.json`; use the `/refresh` endpoint to re-fetch
+- **OpenTelemetry observability** — automatic HTTP request traces, app-level spans, and structured logs
 - **Docker support** — multi-stage Docker build for minimal container images
 
 ![Dashboard Screenshot](./assets//dashboard-screenshot.png)
@@ -23,6 +24,7 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 | Variable | Required | Description |
 |---|---|---|
 | `WATTPILOT_KEY` | Yes | Your Wattpilot data export key |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | No | OTLP/HTTP collector endpoint (for example `http://localhost:4318`) |
 
 You can find the key on your Wattpilot export page — it is the `e=` query parameter in the URL:
 
@@ -35,6 +37,29 @@ Create a `.env` file inside the `src/` directory:
 ```bash
 # src/.env
 WATTPILOT_KEY=your_key_here
+# Optional: send traces/logs to an OpenTelemetry collector
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+```
+
+## Observability (OpenTelemetry)
+
+The app includes built-in **OpenTelemetry tracing and logging**:
+
+- All incoming HTTP requests are instrumented automatically (method, route, status code, duration, propagation headers).
+- Core business operations (data fetch, monthly calculations, refresh flow) emit spans.
+- `slog` is bridged to OpenTelemetry so structured logs are emitted through the OTel log pipeline.
+
+Exporter behavior:
+
+- If `OTEL_EXPORTER_OTLP_ENDPOINT` is set, traces and logs are sent via **OTLP/HTTP** to your collector.
+- If it is not set, telemetry is written to stdout, which is convenient for local development and debugging.
+
+Example local collector setup:
+
+```bash
+# src/.env
+WATTPILOT_KEY=your_key_here
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 ```
 
 ## Getting Started
@@ -131,6 +156,7 @@ Charging costs are calculated using the yearly rates published by the Austrian F
 - [Tailwind CSS](https://tailwindcss.com/) — styling
 - [excelize](https://github.com/qax-os/excelize) — Excel file generation
 - [godotenv](https://github.com/joho/godotenv) — `.env` file loading
+- [OpenTelemetry](https://opentelemetry.io/) — distributed traces and structured logs
 
 ## Project Structure
 
