@@ -25,10 +25,14 @@ go.work.sum
 .env
 
 # binary
-src/wattpilot-exporter
+wattpilot-exporter
+/server
 
 # data
-src/data/data.json
-src/data/*_backup.json
-src/*ladeabrechnung.xlsx
+data/data.json
+data/*_backup.json
+*ladeabrechnung.xlsx
+
+# old src/ layout (can be removed after full migration)
+src/
 

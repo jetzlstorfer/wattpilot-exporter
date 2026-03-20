@@ -7,7 +7,7 @@ metadata:
 services:
   wattpilot:
     host: containerapp
-    project: ./src
+    project: .
     language: docker
     docker:
       path: Dockerfile
