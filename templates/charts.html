@@ -42,6 +42,7 @@
                 <div class="nav-links" id="navLinks">
                     <a href="/" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Dashboard</a>
                     <a href="/charts" class="px-4 py-2 rounded-xl text-sm font-medium bg-white/10 text-white">Charts</a>
+                    <a href="/settings" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Settings</a>
                     <a href="/info" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Info</a>
                     <button id="themeToggle" type="button" class="px-3 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all" aria-label="Toggle theme">🌙</button>
                 </div>
@@ -88,6 +89,7 @@
                             <th class="text-right text-gray-500 font-medium pb-3 pr-6">Sessions</th>
                             <th class="text-right text-gray-500 font-medium pb-3 pr-6">Energy (kWh)</th>
                             <th class="text-right text-gray-500 font-medium pb-3 pr-6">Cost (€)</th>
+                            <th class="text-right text-amber-500/80 font-medium pb-3 pr-6">Charge to Company (€)</th>
                             <th class="text-right text-gray-500 font-medium pb-3 pr-6">Margin (€)</th>
                             <th class="text-right text-gray-500 font-medium pb-3">Download</th>
                         </tr>
@@ -101,6 +103,7 @@
                             <td class="py-3 pr-6 text-right text-gray-400">{{ .Sessions }}</td>
                             <td class="py-3 pr-6 text-right text-gray-300 font-medium">{{ printf "%.2f" .Energy }}</td>
                             <td class="py-3 pr-6 text-right text-gray-300">{{ printf "%.2f" .Price }}</td>
+                            <td class="py-3 pr-6 text-right text-amber-400 font-semibold">{{ printf "%.2f" .Price }}</td>
                             <td class="py-3 pr-6 text-right text-emerald-400 font-medium">{{ printf "%.2f" .Margin }}</td>
                             <td class="py-3 text-right">
                                 <a href="/download?date={{ .Month }}" class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white transition-colors" title="Download Excel report for {{ .Month }}">⬇ Excel</a>

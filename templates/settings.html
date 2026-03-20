@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>Settings – Wattpilot Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#059669">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Wattpilot">
+    <link rel="stylesheet" href="/static/tailwind.css">
+    <link rel="stylesheet" href="/static/dashboard.css">
+    <script>
+        (function () {
+            const stored = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (stored === 'dark' || (!stored && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen antialiased">
+
+    <!-- Navigation -->
+    <nav class="sticky top-0 z-50 bg-gray-950/80 backdrop-blur-xl border-b border-white/5 px-6 py-4">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <a href="/" class="flex items-center gap-3 group">
+                <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-lg shadow-lg group-hover:bg-blue-500 transition-colors">⚡</div>
+                <span class="text-lg font-bold text-white tracking-tight">Wattpilot</span>
+            </a>
+            <div class="flex items-center gap-1" style="position: relative;">
+                <div class="nav-links" id="navLinks">
+                    <a href="/" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Dashboard</a>
+                    <a href="/charts" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Charts</a>
+                    <a href="/settings" class="px-4 py-2 rounded-xl text-sm font-medium bg-white/10 text-white">Settings</a>
+                    <a href="/info" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">Info</a>
+                    <button id="themeToggle" type="button" class="px-3 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all" aria-label="Toggle theme">🌙</button>
+                </div>
+                <button id="hamburger" type="button" class="hamburger px-3 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="navLinks">☰</button>
+                <a href="/refresh" class="ml-2 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-lg shadow-emerald-900/30">↻ Refresh</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto px-6 py-10">
+
+        <div class="mb-10">
+            <p class="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-1">Configuration</p>
+            <h1 class="text-4xl font-extrabold text-white tracking-tight">Settings</h1>
+            <p class="text-gray-400 mt-2">Configure pricing rates and vehicle information</p>
+        </div>
+
+        {{ if .Success }}
+        <div class="mb-8 rounded-2xl bg-emerald-950/60 border border-emerald-500/30 px-6 py-4 flex items-center gap-4">
+            <span class="text-2xl">✅</span>
+            <span class="text-emerald-300 font-semibold">Settings saved successfully</span>
+        </div>
+        {{ end }}
+
+        {{ if .Error }}
+        <div class="mb-8 rounded-2xl bg-red-950/60 border border-red-500/30 px-6 py-4 flex items-center gap-4">
+            <span class="text-2xl">⚠️</span>
+            <div>
+                <span class="text-red-300 font-semibold block">Error</span>
+                <span class="text-red-400 text-sm">{{ .Error }}</span>
+            </div>
+        </div>
+        {{ end }}
+
+        <form method="POST" action="/settings">
+
+            <!-- Car Model -->
+            <div class="card rounded-2xl p-6 mb-6">
+                <h2 class="text-lg font-bold text-white mb-1">Vehicle</h2>
+                <p class="text-sm text-gray-500 mb-6">Car model name used in Excel reports</p>
+                <div class="max-w-md">
+                    <label for="carModel" class="block text-sm font-medium text-gray-400 mb-2">Car Model</label>
+                    <input type="text" id="carModel" name="carModel" value="{{ .CarModel }}"
+                        class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                </div>
+            </div>
+
+            <!-- Official Prices -->
+            <div class="card rounded-2xl p-6 mb-6">
+                <h2 class="text-lg font-bold text-white mb-1">Official Rates (Sachbezug)</h2>
+                <p class="text-sm text-gray-500 mb-6">Austrian government-mandated rate per kWh — used to calculate what you charge your company. Use YYYY-MM for monthly rates or YYYY for year-level fallbacks.</p>
+                <div id="official_entries">
+                    {{ range $i, $e := .OfficialPrices }}
+                    <div class="flex items-center gap-4 mb-3">
+                        <input type="text" name="official_month_{{ $i }}" value="{{ $e.Month }}" placeholder="YYYY-MM or YYYY"
+                            class="w-40 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
+                        <input type="number" step="0.00001" name="official_price_{{ $i }}" value="{{ printf "%.5f" $e.Price }}" placeholder="€/kWh"
+                            class="w-44 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
+                        <button type="button" onclick="this.parentElement.remove(); reindex('official')" class="text-red-400 hover:text-red-300 text-xl font-bold px-2">&times;</button>
+                    </div>
+                    {{ end }}
+                </div>
+                <button type="button" onclick="addRow('official')" class="mt-2 px-4 py-2 rounded-xl text-sm font-semibold bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all">+ Add Entry</button>
+            </div>
+
+            <!-- Purchase Prices -->
+            <div class="card rounded-2xl p-6 mb-6">
+                <h2 class="text-lg font-bold text-white mb-1">Purchase Prices</h2>
+                <p class="text-sm text-gray-500 mb-6">What you actually pay per kWh for electricity — used to calculate savings/margin. Use YYYY-MM for monthly rates or YYYY for year-level fallbacks.</p>
+                <div id="purchase_entries">
+                    {{ range $i, $e := .PurchasePrices }}
+                    <div class="flex items-center gap-4 mb-3">
+                        <input type="text" name="purchase_month_{{ $i }}" value="{{ $e.Month }}" placeholder="YYYY-MM or YYYY"
+                            class="w-40 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
+                        <input type="number" step="0.00001" name="purchase_price_{{ $i }}" value="{{ printf "%.5f" $e.Price }}" placeholder="€/kWh"
+                            class="w-44 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
+                        <button type="button" onclick="this.parentElement.remove(); reindex('purchase')" class="text-red-400 hover:text-red-300 text-xl font-bold px-2">&times;</button>
+                    </div>
+                    {{ end }}
+                </div>
+                <div class="flex gap-3 mt-2">
+                    <button type="button" onclick="addRow('purchase')" class="px-4 py-2 rounded-xl text-sm font-semibold bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all">+ Add Entry</button>
+                    <button type="button" onclick="fetchSteirerStromFlex()" id="fetchPriceBtn" class="px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-700 hover:bg-emerald-600 text-white transition-colors shadow-lg shadow-emerald-900/30">⚡ Fetch SteirerStrom Flex</button>
+                    <span id="fetchPriceStatus" class="self-center text-sm text-gray-400"></span>
+                </div>
+            </div>
+
+            <!-- Network Fee -->
+            <div class="card rounded-2xl p-6 mb-6">
+                <h2 class="text-lg font-bold text-white mb-1">Network Infrastructure Fee (EVN)</h2>
+                <p class="text-sm text-gray-500 mb-6">Monthly flat fee for grid infrastructure — subtracted from savings/margin</p>
+                <div class="max-w-md">
+                    <label for="networkFee" class="block text-sm font-medium text-gray-400 mb-2">Monthly fee (€)</label>
+                    <input type="number" step="0.01" id="networkFee" name="networkFee" value="{{ printf "%.2f" .NetworkFeeMonthly }}"
+                        class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                </div>
+            </div>
+
+            <!-- Submit -->
+            <div class="flex justify-end">
+                <button type="submit" class="px-8 py-3 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-lg shadow-blue-900/30">
+                    💾 Save Settings
+                </button>
+            </div>
+        </form>
+
+    </main>
+
+    <footer class="max-w-6xl mx-auto px-6 pb-10 pt-4 flex items-center justify-between text-xs text-gray-600">
+        <span>Wattpilot Dashboard</span>
+        <div class="flex gap-4">
+            <a href="/" class="hover:text-gray-400 transition-colors">Dashboard</a>
+            <a href="/charts" class="hover:text-gray-400 transition-colors">Charts</a>
+            <a href="/info" class="hover:text-gray-400 transition-colors">About</a>
+        </div>
+    </footer>
+
+    <script src="/static/theme.js"></script>
+
+    <script>
+    function addRow(section) {
+        const container = document.getElementById(section + '_entries');
+        const idx = container.children.length;
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-4 mb-3';
+        row.innerHTML = `
+            <input type="text" name="${section}_month_${idx}" placeholder="YYYY-MM or YYYY"
+                class="w-40 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
+            <input type="number" step="0.00001" name="${section}_price_${idx}" placeholder="€/kWh"
+                class="w-44 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
+            <button type="button" onclick="this.parentElement.remove(); reindex('${section}')" class="text-red-400 hover:text-red-300 text-xl font-bold px-2">&times;</button>
+        `;
+        container.appendChild(row);
+    }
+
+    function reindex(section) {
+        const container = document.getElementById(section + '_entries');
+        const rows = container.children;
+        for (let i = 0; i < rows.length; i++) {
+            const inputs = rows[i].querySelectorAll('input');
+            if (inputs.length >= 2) {
+                inputs[0].name = section + '_month_' + i;
+                inputs[1].name = section + '_price_' + i;
+            }
+        }
+    }
+
+    function fetchSteirerStromFlex() {
+        const btn = document.getElementById('fetchPriceBtn');
+        const status = document.getElementById('fetchPriceStatus');
+        btn.disabled = true;
+        btn.textContent = '⏳ Fetching…';
+        status.textContent = '';
+
+        fetch('/settings/fetch-price')
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    status.textContent = '❌ ' + data.error;
+                    status.className = 'self-center text-sm text-red-400';
+                } else {
+                    // Add a new row with the current month and fetched price
+                    addRow('purchase');
+                    const container = document.getElementById('purchase_entries');
+                    const lastRow = container.children[container.children.length - 1];
+                    const inputs = lastRow.querySelectorAll('input');
+                    if (inputs[0]) inputs[0].value = data.month;
+                    if (inputs[1]) inputs[1].value = data.price.toFixed(5);
+                    status.textContent = '✅ Added ' + data.month + ': ' + (data.price * 100).toFixed(2) + ' ct/kWh (saved)';
+                    status.className = 'self-center text-sm text-emerald-400';
+                }
+            })
+            .catch(err => {
+                status.textContent = '❌ ' + err.message;
+                status.className = 'self-center text-sm text-red-400';
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = '⚡ Fetch SteirerStrom Flex';
+            });
+    }
+    </script>
+
+    <script>
+    (function() {
+        const hamburger = document.getElementById('hamburger');
+        const navLinks = document.getElementById('navLinks');
+        if (!hamburger || !navLinks) return;
+        hamburger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const isOpen = navLinks.classList.toggle('open');
+            hamburger.setAttribute('aria-expanded', String(isOpen));
+        });
+        document.addEventListener('click', function(e) {
+            if (!hamburger.contains(e.target) && !navLinks.contains(e.target)) {
+                navLinks.classList.remove('open');
+                hamburger.setAttribute('aria-expanded', 'false');
+            }
+        });
+    })();
+    </script>
+</body>
+</html>

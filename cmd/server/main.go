@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/handlers"
+	"github.com/jetzlstorfer/wattpilot-exporter/internal/settings"
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/wattpilot"
 	"github.com/joho/godotenv"
 )
@@ -48,6 +49,9 @@ func main() {
 	// Initialise the data store (local filesystem or Azure Blob Storage).
 	wattpilot.InitStore(ctx)
 
+	// Load settings from Azure Blob Storage (falls back to defaults)
+	settings.Load(ctx)
+
 	templateDir := "templates"
 	staticDir := "static"
 
@@ -59,6 +63,8 @@ func main() {
 	mux.HandleFunc("/refresh", handlers.RefreshHandler)
 	mux.HandleFunc("/charts", handlers.ChartHandler(templateDir))
 	mux.HandleFunc("/info", handlers.InfoHandler(templateDir))
+	mux.HandleFunc("/settings", handlers.SettingsHandler(templateDir))
+	mux.HandleFunc("/settings/fetch-price", handlers.FetchPriceHandler)
 	mux.HandleFunc("/download", handlers.DownloadHandler)
 
 	// Wrap the entire mux with the OTel HTTP middleware so every request gets

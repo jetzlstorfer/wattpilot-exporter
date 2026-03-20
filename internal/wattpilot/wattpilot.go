@@ -20,6 +20,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	oteltrace "go.opentelemetry.io/otel/trace"
+
+	"github.com/jetzlstorfer/wattpilot-exporter/internal/settings"
 )
 
 var tracer = otel.Tracer("github.com/jetzlstorfer/wattpilot-exporter/internal/wattpilot")
@@ -420,50 +422,20 @@ func RoundFloat(val float64, precision uint) float64 {
 	return math.Round(val*ratio) / ratio
 }
 
-// GetOfficialPricePerKwhForMonth returns the fixed official price per kWh for
-// the given year-month string (format "2006-01").
+// GetOfficialPricePerKwhForMonth returns the official price per kWh for
+// the given year-month string (format "2006-01"), reading from settings.
 func GetOfficialPricePerKwhForMonth(yearMonth string) float64 {
-	t, _ := time.Parse("2006-01", yearMonth)
-	switch t.Year() {
-	case 2024:
-		return OfficialPricePerKwh2024
-	case 2025:
-		return OfficialPricePerKwh2025
-	case 2026:
-		return OfficialPricePerKwh2026
-	default:
-		return OfficialPricePerKwh2025
-	}
+	return settings.GetOfficialPrice(yearMonth)
 }
 
 func getSellingPriceOfYear(timestamp string) float64 {
-	year, _ := time.Parse("02.01.2006 15:04:05", timestamp)
-	switch year.Year() {
-	case 2024:
-		return OfficialPricePerKwh2024
-	case 2025:
-		return OfficialPricePerKwh2025
-	case 2026:
-		return OfficialPricePerKwh2026
-	default:
-		// set default to 2025 until we have no data for other years
-		return OfficialPricePerKwh2025
-	}
+	t, _ := time.Parse("02.01.2006 15:04:05", timestamp)
+	return settings.GetOfficialPrice(fmt.Sprintf("%d-%02d", t.Year(), t.Month()))
 }
 
 func getPurchasePriceOfYear(timestamp string) float64 {
-	year, _ := time.Parse("02.01.2006 15:04:05", timestamp)
-	switch year.Year() {
-	case 2024:
-		return PurchasePricePerKwh2024
-	case 2025:
-		return PurchasePricePerKwh2025
-	case 2026:
-		return PurchasePricePerKwh2026
-	default:
-		// set default to 2025 until we have no data for other years
-		return PurchasePricePerKwh2025
-	}
+	t, _ := time.Parse("02.01.2006 15:04:05", timestamp)
+	return settings.GetPurchasePrice(fmt.Sprintf("%d-%02d", t.Year(), t.Month()))
 }
 
 func CalculatePrice(endTime string, energy float64, eco float64) float64 {
@@ -474,9 +446,13 @@ func CalculatePriceMargin(endTime string, energy float64, eco float64) float64 {
 	if eco == 100 {
 		return energy * getSellingPriceOfYear(endTime)
 	} else {
-		// TODO calculate the correct ratio
 		return energy * (getSellingPriceOfYear(endTime) - getPurchasePriceOfYear(endTime))
 	}
+}
+
+// GetNetworkFeeMonthly returns the monthly network infrastructure fee in €.
+func GetNetworkFeeMonthly() float64 {
+	return settings.GetNetworkFeeMonthly()
 }
 
 func RefreshData(ctx context.Context) error {

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jetzlstorfer/wattpilot-exporter/internal/settings"
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/wattpilot"
 	"github.com/xuri/excelize/v2"
 )
@@ -21,7 +22,7 @@ func getEntryValue(key string, entry wattpilot.WattpilotEntry) interface{} {
 	case "id_chip":
 		return entry.IDChip
 	case "id_chip_name":
-		return "Volvo EX40"
+		return settings.GetCarModel()
 	case "eco":
 		return entry.Eco
 	case "nexttrip":
@@ -150,6 +151,8 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 		{"Total kWh", nil, "kWh"},
 		{"Price per kWh (€)", wattpilot.RoundFloat(pricePerKwh, 5), "€/kWh"},
 		{"Total Cost (€)", totalCost, fmt.Sprintf("= %.2f kWh × %.5f €/kWh", totalEnergy, pricePerKwh)},
+		{},
+		{"Charge to Company (€)", totalCost, "Amount to invoice your employer"},
 	}
 	for i, rowVals := range summaryRows {
 		for col, val := range rowVals {

@@ -63,6 +63,10 @@ func ChartHandler(templateDir string) http.HandlerFunc {
 				totalEuro += wattpilot.CalculatePrice(session.End, session.Energy, 100)
 				totalMargin += wattpilot.CalculatePriceMargin(session.End, session.Energy, session.Eco)
 			}
+			// Subtract monthly network fee from margin
+			if len(monthData.Data) > 0 {
+				totalMargin -= wattpilot.GetNetworkFeeMonthly()
+			}
 			monthStats = append(monthStats, MonthStat{
 				Month:    months[i],
 				Sessions: len(monthData.Data),

@@ -114,6 +114,11 @@ func calculateData(ctx context.Context, date string) (DashboardData, error) {
 		activeSession = true
 	}
 
+	// Subtract monthly network fee from margin (spread across consumption)
+	if len(parsedData.Data) > 0 {
+		totalMargin -= wattpilot.GetNetworkFeeMonthly()
+	}
+
 	return DashboardData{
 		Date:             monthToCalculate,
 		FormattedDate:    formattedDate,

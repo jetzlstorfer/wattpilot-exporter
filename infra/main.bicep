@@ -23,6 +23,19 @@ param dockerUsername string = ''
 @description('Docker Hub password for pulling images')
 param dockerPassword string = ''
 
+@description('Entra ID App Registration client ID for Easy Auth (leave empty to skip auth)')
+param entraClientId string = ''
+
+@secure()
+@description('Entra ID App Registration client secret for Easy Auth')
+param entraClientSecret string = ''
+
+@description('Custom domain name (e.g. wattpilot.camlann.net). Leave empty to skip.')
+param customDomainName string = ''
+
+@description('Managed certificate resource ID for custom domain. Leave empty to skip.')
+param managedCertificateId string = ''
+
 var abbrs = loadJsonContent('abbreviations.json')
 // Storage accounts don't allow hyphens; strip them from the environment name
 var cleanEnvironmentName = replace(environmentName, '-', '')
@@ -56,6 +69,17 @@ module keyVault 'modules/key-vault.bicep' = {
     tags: tags
     secretName: 'wattpilot-key'
     secretValue: wattpilotKey
+  }
+}
+
+// Blob Storage for app settings
+module blobStorage 'modules/blob-storage.bicep' = {
+  name: 'blob-storage'
+  scope: rg
+  params: {
+    name: 'st${resourceToken}'
+    location: location
+    tags: tags
   }
 }
 
@@ -94,6 +118,11 @@ module containerApp 'modules/container-app.bicep' = {
     containerImage: containerImage
     keyVaultSecretUri: keyVault.outputs.secretUri
     keyVaultIdentityResourceId: keyVaultIdentity.outputs.id
+    storageEndpoint: blobStorage.outputs.endpoint
+    entraClientId: entraClientId
+    entraClientSecret: entraClientSecret
+    customDomainName: customDomainName
+    managedCertificateId: managedCertificateId
     dockerUsername: dockerUsername
     dockerPassword: dockerPassword
     storageAccountName: storageAccount.outputs.name
@@ -127,6 +156,16 @@ module storageAccountAccess 'modules/storage-account-access.bicep' = {
   scope: rg
   params: {
     storageAccountName: storageAccount.outputs.name
+    principalId: containerApp.outputs.identityPrincipalId
+  }
+}
+
+// Grant the Container App's managed identity access to Blob Storage
+module blobStorageAccess 'modules/blob-storage-access.bicep' = {
+  name: 'blob-storage-access'
+  scope: rg
+  params: {
+    storageAccountName: blobStorage.outputs.name
     principalId: containerApp.outputs.identityPrincipalId
   }
 }

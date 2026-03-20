@@ -19,6 +19,18 @@
     },
     "dockerPassword": {
       "value": "${DOCKER_PASSWORD=}"
+    },
+    "entraClientId": {
+      "value": "${ENTRA_CLIENT_ID=}"
+    },
+    "entraClientSecret": {
+      "value": "${ENTRA_CLIENT_SECRET=}"
+    },
+    "customDomainName": {
+      "value": "${CUSTOM_DOMAIN_NAME=}"
+    },
+    "managedCertificateId": {
+      "value": "${MANAGED_CERTIFICATE_ID=}"
     }
   }
 }

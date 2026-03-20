@@ -5,12 +5,20 @@ param containerAppsEnvironmentId string
 param containerImage string
 param keyVaultSecretUri string
 param keyVaultIdentityResourceId string
+param storageAccountName string
+param storageEndpoint string = ''
+param entraClientId string = ''
+@secure()
+param entraClientSecret string = ''
 param dockerUsername string = ''
 @secure()
 param dockerPassword string = ''
-param storageAccountName string
+param customDomainName string = ''
+param managedCertificateId string = ''
 
 var hasDockerCredentials = !empty(dockerUsername) && !empty(dockerPassword)
+var hasEntraAuth = !empty(entraClientId) && !empty(entraClientSecret)
+var hasCustomDomain = !empty(customDomainName) && !empty(managedCertificateId)
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: name
@@ -31,6 +39,13 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: 8080
         transport: 'auto'
         allowInsecure: false
+        customDomains: hasCustomDomain ? [
+          {
+            name: customDomainName
+            certificateId: managedCertificateId
+            bindingType: 'SniEnabled'
+          }
+        ] : []
       }
       secrets: [
         {
@@ -42,6 +57,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           {
             name: 'docker-password'
             value: dockerPassword
+          }
+        ] : [])
+        ...(hasEntraAuth ? [
+          {
+            name: 'microsoft-provider-authentication-secret'
+            value: entraClientSecret
           }
         ] : [])
       ]
@@ -71,6 +92,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'AZURE_STORAGE_ACCOUNT_NAME'
               value: storageAccountName
             }
+            {
+              name: 'AZURE_STORAGE_ENDPOINT'
+              value: storageEndpoint
+            }
           ]
         }
       ]
@@ -85,3 +110,42 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 output name string = containerApp.name
 output fqdn string = containerApp.properties.configuration.ingress.fqdn
 output identityPrincipalId string = containerApp.identity.principalId
+
+// Easy Auth with Microsoft Entra ID (only if client ID is provided)
+resource authConfig 'Microsoft.App/containerApps/authConfigs@2024-03-01' = if (hasEntraAuth) {
+  parent: containerApp
+  name: 'current'
+  properties: {
+    platform: {
+      enabled: true
+    }
+    globalValidation: {
+      unauthenticatedClientAction: 'RedirectToLoginPage'
+      redirectToProvider: 'azureactivedirectory'
+    }
+    login: {
+      tokenStore: {
+        enabled: false
+      }
+    }
+    identityProviders: {
+      azureActiveDirectory: {
+        enabled: true
+        registration: {
+          clientId: entraClientId
+          clientSecretSettingName: 'microsoft-provider-authentication-secret'
+          openIdIssuer: 'https://login.microsoftonline.com/${subscription().tenantId}/v2.0'
+        }
+        login: {
+          loginParameters: ['scope=openid profile email']
+        }
+        validation: {
+          allowedAudiences: [
+            entraClientId
+            'api://${entraClientId}'
+          ]
+        }
+      }
+    }
+  }
+}
