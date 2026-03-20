@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"fmt"
@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"time"
 
-	wattpilotutils "github.com/jetzlstorfer/wattpilot-exporter/utils"
+	"github.com/jetzlstorfer/wattpilot-exporter/internal/wattpilot"
 	"github.com/xuri/excelize/v2"
 )
 
 // getEntryValue maps a wattpilot column key to the corresponding field value
 // from a WattpilotEntry, preserving the original CSV structure.
-func getEntryValue(key string, entry wattpilotutils.WattpilotEntry) interface{} {
+func getEntryValue(key string, entry wattpilot.WattpilotEntry) interface{} {
 	switch key {
 	case "session_number":
 		return entry.SessionNumber
@@ -49,7 +49,8 @@ func getEntryValue(key string, entry wattpilotutils.WattpilotEntry) interface{} 
 	}
 }
 
-func downloadHandler(w http.ResponseWriter, r *http.Request) {
+// DownloadHandler handles GET /download.
+func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	date := r.URL.Query().Get("date")
 
@@ -59,7 +60,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the full wattpilot data for the month (preserving CSV structure)
-	parsedData, err := wattpilotutils.GetStatsForMonth(ctx, monthToCalculate)
+	parsedData, err := wattpilot.GetStatsForMonth(ctx, monthToCalculate)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Unable to generate report: %v", err), http.StatusInternalServerError)
 		slog.ErrorContext(ctx, "downloadHandler: failed to get stats", "error", err)
@@ -135,10 +136,10 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	for _, entry := range parsedData.Data {
 		totalEnergy += entry.Energy
 	}
-	totalEnergy = wattpilotutils.RoundFloat(totalEnergy, 2)
+	totalEnergy = wattpilot.RoundFloat(totalEnergy, 2)
 
-	pricePerKwh := wattpilotutils.GetOfficialPricePerKwhForMonth(monthToCalculate)
-	totalCost := wattpilotutils.RoundFloat(totalEnergy*pricePerKwh, 2)
+	pricePerKwh := wattpilot.GetOfficialPricePerKwhForMonth(monthToCalculate)
+	totalCost := wattpilot.RoundFloat(totalEnergy*pricePerKwh, 2)
 
 	// Energy column SUM formula (e.g. =SUM(M2:M25))
 	energyColName, _ := excelize.ColumnNumberToName(energyColIdx)
@@ -147,7 +148,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	summaryRows := [][]interface{}{
 		{"Total kWh", nil, "kWh"},
-		{"Price per kWh (€)", wattpilotutils.RoundFloat(pricePerKwh, 5), "€/kWh"},
+		{"Price per kWh (€)", wattpilot.RoundFloat(pricePerKwh, 5), "€/kWh"},
 		{"Total Cost (€)", totalCost, fmt.Sprintf("= %.2f kWh × %.5f €/kWh", totalEnergy, pricePerKwh)},
 	}
 	for i, rowVals := range summaryRows {

@@ -1,4 +1,4 @@
-package wattpilotutils
+package wattpilot
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
-var tracer = otel.Tracer("github.com/jetzlstorfer/wattpilot-exporter/utils")
+var tracer = otel.Tracer("github.com/jetzlstorfer/wattpilot-exporter/internal/wattpilot")
 
 // refreshMu guards RefreshData to prevent concurrent writes to data files.
 var refreshMu sync.Mutex

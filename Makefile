@@ -15,7 +15,7 @@ RUN_FLAGS :=
 
 # Build the application
 build:
-	$(GO) build $(BUILD_FLAGS) -o $(EXECUTABLE)
+	$(GO) build $(BUILD_FLAGS) -o $(EXECUTABLE) ./cmd/server
 
 # Run the application
 run:
@@ -26,7 +26,7 @@ run:
 		kill $$pid; \
 		sleep 1; \
 	fi
-	$(GO) run $(RUN_FLAGS) .
+	$(GO) run $(RUN_FLAGS) ./cmd/server
 
 run-cached: # don't delete data/data.json before running
 	@pid=`command -v lsof >/dev/null 2>&1 && lsof -ti tcp:8080 -sTCP:LISTEN 2>/dev/null | head -n 1 || true`; \
@@ -35,7 +35,7 @@ run-cached: # don't delete data/data.json before running
 		kill $$pid; \
 		sleep 1; \
 	fi
-	$(GO) run $(RUN_FLAGS) . 
+	$(GO) run $(RUN_FLAGS) ./cmd/server
 
 # Clean the build artifacts
 clean:
