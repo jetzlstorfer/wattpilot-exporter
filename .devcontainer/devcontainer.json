@@ -24,7 +24,7 @@
       "moby": false
     }
   },
-  "postCreateCommand": "cd src && go mod download",
+  "postCreateCommand": "go mod download",
   "remoteEnv": {
     "WATTPILOT_KEY": "${localEnv:WATTPILOT_KEY}"
   }
