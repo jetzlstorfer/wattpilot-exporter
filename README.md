@@ -12,7 +12,7 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 - **OpenTelemetry observability** — automatic HTTP request traces, app-level spans, and structured logs
 - **Docker support** — multi-stage Docker build for minimal container images
 
-![Dashboard Screenshot](./assets//dashboard-screenshot.png)
+![Dashboard Screenshot](./assets/dashboard-screenshot.png)
 
 ## Prerequisites
 
@@ -32,10 +32,10 @@ You can find the key on your Wattpilot export page — it is the `e=` query para
 https://data.wattpilot.io/export?e=THIS_IS_YOUR_KEY
 ```
 
-Create a `.env` file inside the `src/` directory:
+Create a `.env` file in the repository root (see `.env.example`):
 
 ```bash
-# src/.env
+# .env
 WATTPILOT_KEY=your_key_here
 # Optional: send traces/logs to an OpenTelemetry collector
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
@@ -57,7 +57,7 @@ Exporter behavior:
 Example local collector setup:
 
 ```bash
-# src/.env
+# .env
 WATTPILOT_KEY=your_key_here
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 ```
@@ -67,14 +67,12 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 ### Run locally
 
 ```bash
-cd src
-go run .
+go run ./cmd/server
 ```
 
 Or use the Makefile:
 
 ```bash
-cd src
 make run        # fetches fresh data (deletes cached data/data.json first)
 make run-cached # uses cached data/data.json if available
 ```
@@ -84,12 +82,11 @@ The application starts on **http://localhost:8080**.
 ### Run with Docker
 
 ```bash
-cd src
 make docker-build
 make docker-run
 ```
 
-> Make sure a `.env` file with your `WATTPILOT_KEY` exists in `src/` — it is passed to the container via `--env-file`.
+> Make sure a `.env` file with your `WATTPILOT_KEY` exists in the repository root — it is passed to the container via `--env-file`.
 
 ### Deploy to Azure
 
@@ -161,19 +158,25 @@ Charging costs are calculated using the yearly rates published by the Austrian F
 ## Project Structure
 
 ```
-src/
-├── main.go          # HTTP server, routes & main handler
-├── chart.go         # /charts handler — historical month-over-month stats
-├── download.go      # /download handler — Excel export
-├── data/            # cached data.json and monthly *_backup.json files
-├── utils/
-│   └── wattpilotutils.go  # API client, price calculation, data parsing
-├── template.html    # Main dashboard template
-├── charts.html      # Charts page template
-├── info.html        # Info page template
-├── static/          # Chart.js & Tailwind CSS assets
-├── Dockerfile       # Multi-stage Alpine build
-├── makefile         # Build, run & Docker targets
+wattpilot-exporter/
+├── cmd/
+│   └── server/
+│       ├── main.go          # HTTP server, routes & signal handling
+│       └── telemetry.go     # OpenTelemetry initialisation
+├── internal/
+│   ├── handlers/
+│   │   ├── dashboard.go     # / handler — monthly dashboard
+│   │   ├── charts.go        # /charts handler — historical month-over-month stats
+│   │   └── download.go      # /download handler — Excel export
+│   └── wattpilot/
+│       └── wattpilot.go     # API client, price calculation, data parsing & caching
+├── templates/               # HTML templates (dashboard, charts, info)
+├── static/                  # Client-side assets (Chart.js, Tailwind CSS, icons, PWA manifest)
+├── data/                    # Runtime cache — data.json and monthly *_backup.json files
+├── infra/                   # Azure Bicep IaC
+├── Dockerfile               # Multi-stage Alpine build
+├── Makefile                 # Build, run & Docker targets
+├── azure.yaml               # Azure Developer CLI configuration
 └── go.mod
 ```
 
