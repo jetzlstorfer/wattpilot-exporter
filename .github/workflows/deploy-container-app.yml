@@ -55,7 +55,7 @@ jobs:
     
     steps:
       - name: Azure Login
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.WATTPILOT_AZURE_CLIENT_ID }}
           subscription-id: ${{ secrets.WATTPILOT_AZURE_SUBSCRIPTION_ID }}
