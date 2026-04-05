@@ -1,8 +1,46 @@
 package wattpilot
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 )
+
+func TestHTTPClientHasTimeout(t *testing.T) {
+	if httpClient.Timeout <= 0 {
+		t.Errorf("httpClient.Timeout must be > 0, got %v", httpClient.Timeout)
+	}
+}
+
+func TestFetchJSON_TimesOut(t *testing.T) {
+	// Create a test server that never responds.
+	slowServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Block until the test context is cancelled.
+		<-r.Context().Done()
+	}))
+	defer slowServer.Close()
+
+	testTimeout := 100 * time.Millisecond
+	original := httpClient
+	httpClient = &http.Client{Timeout: testTimeout}
+	defer func() { httpClient = original }()
+
+	start := time.Now()
+	_, err := FetchJSON(context.Background(), slowServer.URL)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("FetchJSON should return an error when the server does not respond")
+	}
+	// Allow generous headroom (10x the configured timeout) to account for CI variability,
+	// while still catching a true hang.
+	if elapsed > 10*testTimeout {
+		t.Errorf("FetchJSON hung for %v; expected it to time out within ~%v", elapsed, testTimeout)
+	}
+}
+
 
 func TestRoundFloat(t *testing.T) {
 	tests := []struct {

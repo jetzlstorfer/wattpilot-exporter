@@ -36,7 +36,14 @@ const PurchasePricePerKwh2025 = 0.25
 const PurchasePricePerKwh2026 = 0.25
 const JSONFileName = "data/data.json"
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
-const DataTTLMinutes = 60 // Auto-refresh data if older than this many minutes
+const DataTTLMinutes = 60  // Auto-refresh data if older than this many minutes
+const FetchTimeoutSeconds = 30 // Timeout for outbound API requests
+
+// httpClient is a shared HTTP client with an explicit timeout so that
+// requests to the Wattpilot API never hang indefinitely.
+var httpClient = &http.Client{
+	Timeout: FetchTimeoutSeconds * time.Second,
+}
 
 type WattpilotColumn struct {
 	Key       string `json:"key"`
@@ -95,7 +102,7 @@ func FetchJSON(ctx context.Context, fetchURL string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
 
-	response, err := http.DefaultClient.Do(req)
+	response, err := httpClient.Do(req)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
