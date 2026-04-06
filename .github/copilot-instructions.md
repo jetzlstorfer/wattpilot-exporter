@@ -24,6 +24,9 @@ wattpilot-exporter/
   Makefile
   Dockerfile
   azure.yaml
+  .env.example                     # example environment variables
+  .devcontainer/                   # VS Code Dev Container configuration
+  assets/                          # static assets for documentation (e.g. screenshots)
   cmd/
     server/
       main.go                      # entrypoint — server wiring, signal handling
@@ -75,7 +78,7 @@ The application is deployed to **Azure Container Apps** using:
 - **Infrastructure as Code**: Bicep templates in `infra/` (see `infra/main.bicep` and modules)
 - **Azure Developer CLI**: Configuration in `azure.yaml` for automated provisioning and deployment
 - **Secrets Management**: `WATTPILOT_KEY` stored securely in **Azure Key Vault**; the Container App uses a system-assigned managed identity to access it
-- **Container Build & Push**: `azd deploy` builds the Docker image and pushes it to the Docker Hub repository `jetzlstorfer/wattpilot-export` using a timestamp-based image tag per deployment, then updates the Container App to use the new image
+- **Container Build & Push**: `azd deploy` builds the Docker image and pushes it to the Docker Hub repository `jetzlstorfer/wattpilot-exporter` using a timestamp-based image tag per deployment, then updates the Container App to use the new image
 
 ### Deployment workflow:
 
@@ -99,3 +102,7 @@ See [AZD-SETUP.md](AZD-SETUP.md) for detailed instructions.
 - **Key Vault**: Stores `WATTPILOT_KEY` secret
 - **Log Analytics Workspace**: Collects container logs
 - **Managed Identity**: RBAC access to Key Vault
+
+## Pull Request Guidelines
+
+- **Always add screenshots** to every pull request that includes UI or visual changes. Place screenshot images in the `assets/` directory and embed them in the PR description. This helps reviewers verify that the UI looks correct without having to run the application locally.
