@@ -65,6 +65,13 @@ func main() {
 	srv := &http.Server{
 		Addr:    ":8080",
 		Handler: handler,
+		// ReadTimeout covers reading the request headers/body.
+		// WriteTimeout must exceed the API fetch timeout (FetchTimeoutSeconds = 30s)
+		// to allow handlers that trigger a data refresh to complete successfully.
+		// IdleTimeout limits keep-alive connections between requests.
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	slog.InfoContext(ctx, "Starting server", "addr", ":8080")
