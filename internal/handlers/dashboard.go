@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"time"
 
@@ -62,6 +63,8 @@ func calculateData(ctx context.Context, date string) (DashboardData, error) {
 			Error:         "The requested month is invalid. Please use format YYYY-MM.",
 		}, nil
 	}
+	// Use the re-formatted string to ensure the value is always a clean YYYY-MM.
+	monthToCalculate = parsedTime.Format("2006-01")
 	formattedDate := parsedTime.Format("January 2006")
 
 	parsedData, err := wattpilot.GetStatsForMonth(ctx, monthToCalculate)
@@ -190,7 +193,9 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 		slog.ErrorContext(r.Context(), "refreshHandler: failed to refresh data", "error", err)
 		// Redirect back to the dashboard so the user still sees the cached data.
 		// The error message is surfaced via the ?error query parameter.
-		http.Redirect(w, r, "/?error=Data+could+not+be+fetched+from+the+API.+Previous+data+is+still+displayed.", http.StatusSeeOther)
+		q := url.Values{}
+		q.Set("error", "Data could not be fetched from the API. Previous data is still displayed.")
+		http.Redirect(w, r, "/?"+q.Encode(), http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)

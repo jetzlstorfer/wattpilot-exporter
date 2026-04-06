@@ -13,6 +13,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 )
 
 // DataStore abstracts the underlying storage backend (local filesystem or Azure Blob Storage).
@@ -61,11 +62,13 @@ func InitStore(ctx context.Context) {
 		return
 	}
 
+	containerClient := client.ServiceClient().NewContainerClient(containerName)
+
 	slog.InfoContext(ctx, "Using Azure Blob Storage",
 		"account", accountName,
 		"container", containerName,
 	)
-	globalStore = &AzureBlobStore{client: client, containerName: containerName}
+	globalStore = &AzureBlobStore{containerClient: containerClient}
 }
 
 // ---------------------------------------------------------------------------
@@ -128,12 +131,11 @@ func (LocalStore) ModTime(_ context.Context, name string) (time.Time, error) {
 
 // AzureBlobStore implements DataStore using Azure Blob Storage.
 type AzureBlobStore struct {
-	client        *azblob.Client
-	containerName string
+	containerClient *container.Client
 }
 
 func (s *AzureBlobStore) Read(ctx context.Context, name string) ([]byte, error) {
-	resp, err := s.client.DownloadStream(ctx, s.containerName, name, nil)
+	resp, err := s.containerClient.NewBlockBlobClient(name).DownloadStream(ctx, nil)
 	if err != nil {
 		if isBlobNotFound(err) {
 			return nil, &os.PathError{Op: "open", Path: name, Err: os.ErrNotExist}
@@ -145,7 +147,7 @@ func (s *AzureBlobStore) Read(ctx context.Context, name string) ([]byte, error) 
 }
 
 func (s *AzureBlobStore) Write(ctx context.Context, name string, data []byte) error {
-	_, err := s.client.UploadStream(ctx, s.containerName, name, bytes.NewReader(data), nil)
+	_, err := s.containerClient.NewBlockBlobClient(name).UploadStream(ctx, bytes.NewReader(data), nil)
 	if err != nil {
 		return fmt.Errorf("failed to upload blob %s: %w", name, err)
 	}
@@ -153,7 +155,7 @@ func (s *AzureBlobStore) Write(ctx context.Context, name string, data []byte) er
 }
 
 func (s *AzureBlobStore) ModTime(ctx context.Context, name string) (time.Time, error) {
-	resp, err := s.client.ServiceClient().NewContainerClient(s.containerName).NewBlockBlobClient(name).GetProperties(ctx, nil)
+	resp, err := s.containerClient.NewBlockBlobClient(name).GetProperties(ctx, nil)
 	if err != nil {
 		if isBlobNotFound(err) {
 			return time.Time{}, &os.PathError{Op: "stat", Path: name, Err: os.ErrNotExist}
