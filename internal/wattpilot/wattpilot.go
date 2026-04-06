@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,7 +36,7 @@ const PurchasePricePerKwh2026 = 0.25
 const JSONFileName = "data/data.json"
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 const DataTTLMinutes = 60  // Auto-refresh data if older than this many minutes
-const FetchTimeoutSeconds = 30 // Timeout for outbound API requests
+const FetchTimeoutSeconds = 5 // Timeout for outbound API requests
 
 // httpClient is a shared HTTP client with an explicit timeout so that
 // requests to the Wattpilot API never hang indefinitely.
@@ -121,15 +120,15 @@ func FetchJSON(ctx context.Context, fetchURL string) ([]byte, error) {
 	return jsonData, nil
 }
 
-// isDataStale checks if the data/data.json file is older than DataTTLMinutes
-func isDataStale() bool {
-	fileInfo, err := os.Stat(JSONFileName)
+// isDataStale checks if the data/data.json file/blob is older than DataTTLMinutes
+func isDataStale(ctx context.Context) bool {
+	modTime, err := globalStore.ModTime(ctx, JSONFileName)
 	if err != nil {
-		// File doesn't exist or can't be accessed - consider it stale
+		// File/blob doesn't exist or can't be accessed - consider it stale
 		return true
 	}
 
-	fileAge := time.Since(fileInfo.ModTime())
+	fileAge := time.Since(modTime)
 	ttl := time.Duration(DataTTLMinutes) * time.Minute
 
 	return fileAge > ttl
@@ -138,7 +137,7 @@ func isDataStale() bool {
 // tryAutoRefresh attempts to refresh data if it's stale and WATTPILOT_KEY is set
 // Returns true if a refresh was attempted (regardless of success/failure)
 func tryAutoRefresh(ctx context.Context) bool {
-	if !isDataStale() {
+	if !isDataStale(ctx) {
 		return false // Data is fresh, no need to refresh
 	}
 
@@ -163,10 +162,10 @@ func GetJSONData(ctx context.Context) ([]byte, error) {
 	// Try to auto-refresh if data is stale
 	tryAutoRefresh(ctx)
 
-	// Read JSON document from file (whether it's fresh or stale)
-	jsonData, err := readJSONFile(JSONFileName)
+	// Read JSON document from storage (whether it's fresh or stale)
+	jsonData, err := globalStore.Read(ctx, JSONFileName)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to read JSON file", "error", err)
+		slog.ErrorContext(ctx, "Failed to read JSON data", "error", err)
 		// Don't auto-fetch here anymore - let the caller decide whether to use backup or fetch
 		return nil, err
 	}
@@ -174,48 +173,12 @@ func GetJSONData(ctx context.Context) ([]byte, error) {
 	return jsonData, nil
 }
 
-func readJSONFile(filename string) ([]byte, error) {
-	jsonFile, err := os.Open(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open JSON file: %v", err)
-	}
-	defer jsonFile.Close()
-
-	jsonData, err := io.ReadAll(jsonFile)
-	if err != nil {
-		return jsonData, fmt.Errorf("failed to read JSON data: %v", err)
-	}
-	return jsonData, nil
+func readJSONFile(ctx context.Context, filename string) ([]byte, error) {
+	return globalStore.Read(ctx, filename)
 }
 
-func saveJSONFile(filename string, jsonData []byte) error {
-	if err := os.MkdirAll(filepath.Dir(filename), 0o755); err != nil {
-		return fmt.Errorf("failed to create directory for %s: %v", filename, err)
-	}
-
-	// Write to a temp file in the same directory, then rename atomically
-	tmpFile, err := os.CreateTemp(filepath.Dir(filename), ".tmp-wattpilot-*.json")
-	if err != nil {
-		return fmt.Errorf("failed to create temp file: %v", err)
-	}
-	tmpName := tmpFile.Name()
-
-	_, err = tmpFile.Write(jsonData)
-	closeErr := tmpFile.Close()
-	if err != nil {
-		os.Remove(tmpName)
-		return fmt.Errorf("failed to write JSON data: %v", err)
-	}
-	if closeErr != nil {
-		os.Remove(tmpName)
-		return fmt.Errorf("failed to close temp file: %v", closeErr)
-	}
-
-	if err := os.Rename(tmpName, filename); err != nil {
-		os.Remove(tmpName)
-		return fmt.Errorf("failed to rename temp file to %s: %v", filename, err)
-	}
-	return nil
+func saveJSONFile(ctx context.Context, filename string, jsonData []byte) error {
+	return globalStore.Write(ctx, filename, jsonData)
 }
 
 func getMonthlyBackupFilename(yearMonth string) string {
@@ -223,7 +186,7 @@ func getMonthlyBackupFilename(yearMonth string) string {
 }
 
 // createMonthlyBackups extracts data for each month and saves it to a backup file
-func createMonthlyBackups(allData WattpilotData) error {
+func createMonthlyBackups(ctx context.Context, allData WattpilotData) error {
 	// Group data by month
 	monthDataMap := make(map[string][]WattpilotEntry)
 
@@ -250,7 +213,7 @@ func createMonthlyBackups(allData WattpilotData) error {
 		}
 
 		backupFilename := getMonthlyBackupFilename(monthKey)
-		err = saveJSONFile(backupFilename, backupBytes)
+		err = saveJSONFile(ctx, backupFilename, backupBytes)
 		if err != nil {
 			slog.Warn("Failed to create backup", "month", monthKey, "error", err)
 			// Don't fail the entire operation if one backup fails
@@ -261,9 +224,9 @@ func createMonthlyBackups(allData WattpilotData) error {
 }
 
 // tryMonthlyBackup attempts to read data from a monthly backup file
-func tryMonthlyBackup(monthYearStr string) ([]byte, error) {
+func tryMonthlyBackup(ctx context.Context, monthYearStr string) ([]byte, error) {
 	backupFilename := getMonthlyBackupFilename(monthYearStr)
-	return readJSONFile(backupFilename)
+	return readJSONFile(ctx, backupFilename)
 }
 
 func PrepUrl(wattpilotDataUrl string, from string, to string, key string) string {
@@ -346,7 +309,7 @@ func GetStatsForMonth(ctx context.Context, monthToCalculate string) (WattpilotDa
 	// If main file doesn't exist or is corrupted, try monthly backup
 	if err != nil {
 		slog.WarnContext(ctx, "Main data file unavailable, trying backup", "month", monthToCalculate, "error", err)
-		backupData, backupErr := tryMonthlyBackup(monthToCalculate)
+		backupData, backupErr := tryMonthlyBackup(ctx, monthToCalculate)
 		if backupErr != nil {
 			// Both main and backup failed
 			span.RecordError(backupErr)
@@ -363,7 +326,7 @@ func GetStatsForMonth(ctx context.Context, monthToCalculate string) (WattpilotDa
 		// Main parsing failed, try backup if we were using the main file
 		if usedMainFile {
 			slog.WarnContext(ctx, "Failed to parse main JSON, trying backup", "error", err)
-			backupData, backupErr := tryMonthlyBackup(monthToCalculate)
+			backupData, backupErr := tryMonthlyBackup(ctx, monthToCalculate)
 			if backupErr != nil {
 				span.RecordError(err)
 				span.SetStatus(codes.Error, err.Error())
@@ -523,7 +486,7 @@ func RefreshData(ctx context.Context) error {
 	}
 
 	// Save JSON document to main file
-	err = saveJSONFile(JSONFileName, jsonData)
+	err = saveJSONFile(ctx, JSONFileName, jsonData)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -531,7 +494,7 @@ func RefreshData(ctx context.Context) error {
 	}
 
 	// Create monthly backups for each month in the fetched data
-	err = createMonthlyBackups(parsedData)
+	err = createMonthlyBackups(ctx, parsedData)
 	if err != nil {
 		// Log the error but don't fail - we successfully saved the main file
 		slog.WarnContext(ctx, "Failed to create some backups", "error", err)

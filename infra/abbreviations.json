@@ -4,5 +4,6 @@
   "keyVault": "kv-",
   "containerAppsEnvironment": "cae-",
   "containerApp": "ca-",
-  "containerRegistry": "cr"
+  "containerRegistry": "cr",
+  "storageAccount": "st"
 }

@@ -7,6 +7,7 @@ param keyVaultSecretUri string
 param dockerUsername string = ''
 @secure()
 param dockerPassword string = ''
+param storageAccountName string
 
 var hasDockerCredentials = !empty(dockerUsername) && !empty(dockerPassword)
 
@@ -61,6 +62,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'WATTPILOT_KEY'
               secretRef: 'wattpilot-key'
+            }
+            {
+              name: 'AZURE_STORAGE_ACCOUNT_NAME'
+              value: storageAccountName
             }
           ]
         }

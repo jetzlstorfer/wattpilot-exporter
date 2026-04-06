@@ -135,6 +135,11 @@ func DashboardHandler(templateDir string) http.HandlerFunc {
 			slog.ErrorContext(r.Context(), "mainHandler: error calculating data", "error", err)
 		}
 
+		// Surface a refresh-error message (passed via query param by RefreshHandler on failure).
+		if refreshErr := r.URL.Query().Get("error"); refreshErr != "" && data.Error == "" {
+			data.Error = refreshErr
+		}
+
 		tmpl, err := template.ParseFiles(filepath.Join(templateDir, "template.html"))
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -183,7 +188,9 @@ func RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	err := wattpilot.RefreshData(r.Context())
 	if err != nil {
 		slog.ErrorContext(r.Context(), "refreshHandler: failed to refresh data", "error", err)
-		http.Error(w, "Failed to refresh data. Please try again later.", http.StatusInternalServerError)
+		// Redirect back to the dashboard so the user still sees the cached data.
+		// The error message is surfaced via the ?error query parameter.
+		http.Redirect(w, r, "/?error=Data+could+not+be+fetched+from+the+API.+Previous+data+is+still+displayed.", http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)

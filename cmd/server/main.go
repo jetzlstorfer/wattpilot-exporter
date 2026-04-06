@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/handlers"
+	"github.com/jetzlstorfer/wattpilot-exporter/internal/wattpilot"
 	"github.com/joho/godotenv"
 )
 
@@ -43,6 +44,9 @@ func main() {
 	// Replace the default slog logger with one that bridges to OTel.
 	logger := otelslog.NewLogger(serviceName)
 	slog.SetDefault(logger)
+
+	// Initialise the data store (local filesystem or Azure Blob Storage).
+	wattpilot.InitStore(ctx)
 
 	templateDir := "templates"
 	staticDir := "static"
