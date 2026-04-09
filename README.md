@@ -8,7 +8,7 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 - **Historical charts** — visualize energy consumption and costs over time (data since June 2024)
 - **Excel export** — download a per-month `.xlsx` billing report with detailed session data and cost summary
 - **Live charging indicator** — detects whether a charging session is currently active
-- **Data caching** — fetched data is cached locally as `data/data.json`; monthly backups are stored as `data/*_backup.json`; use the `/refresh` endpoint to re-fetch
+- **Data caching and backup fallback** — data is cached in local filesystem storage or Azure Blob Storage; monthly backups are stored as `data/*_backup.json`; use the `/refresh` endpoint to re-fetch
 - **OpenTelemetry observability** — automatic HTTP request traces, app-level spans, and structured logs
 - **Docker support** — multi-stage Docker build for minimal container images
 
@@ -25,6 +25,8 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 |---|---|---|
 | `WATTPILOT_KEY` | Yes | Your Wattpilot data export key |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | No | OTLP/HTTP collector endpoint (for example `http://localhost:4318`) |
+| `AZURE_STORAGE_ACCOUNT_NAME` | No | Enables Azure Blob Storage backend when set |
+| `AZURE_STORAGE_CONTAINER_NAME` | No | Blob container name (defaults to `wattpilot-data`) |
 
 You can find the key on your Wattpilot export page — it is the `e=` query parameter in the URL:
 
@@ -92,7 +94,7 @@ make docker-run
 
 This project is configured for deployment to **Azure Container Apps** using the **Azure Developer CLI (azd)**.
 
-`WATTPILOT_KEY` is stored in **Azure Key Vault** and consumed by the Container App via a Key Vault secret reference.
+`WATTPILOT_KEY` is stored in **Azure Key Vault** and consumed by the Container App via a Key Vault secret reference using a **user-assigned managed identity**. The application writes cached data and backups to Azure Blob Storage using a **system-assigned managed identity**.
 
 **Prerequisites:**
 - [Azure Developer CLI (`azd`)](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/)
@@ -114,7 +116,6 @@ azd env set AZURE_LOCATION swedencentral
 azd env set WATTPILOT_KEY <your-wattpilot-api-key>
 azd env set DOCKER_USERNAME <your-dockerhub-username>
 azd env set DOCKER_PASSWORD <your-dockerhub-password>
-azd env set CONTAINER_IMAGE jetzlstorfer/wattpilot-export:latest
 
 # Provision infrastructure
 azd provision
@@ -125,6 +126,8 @@ azd deploy
 # Get the deployed URL
 azd env get-values | grep AZURE_CONTAINER_APP_FQDN
 ```
+
+`azd deploy` automatically builds, tags, and pushes the container image; no manual `CONTAINER_IMAGE` value is required.
 
 See [AZD-SETUP.md](AZD-SETUP.md) for detailed Azure deployment instructions.
 
@@ -171,7 +174,8 @@ wattpilot-exporter/
 │   │   ├── charts.go        # /charts handler — historical month-over-month stats
 │   │   └── download.go      # /download handler — Excel export
 │   └── wattpilot/
-│       └── wattpilot.go     # API client, price calculation, data parsing & caching
+│       ├── storage.go       # local filesystem / Azure Blob storage abstraction
+│       └── wattpilot.go     # API client, refresh logic, pricing, parsing & backup handling
 ├── templates/               # HTML templates (dashboard, charts, info)
 ├── static/                  # Client-side assets (Chart.js, Tailwind CSS, icons, PWA manifest)
 ├── data/                    # Runtime cache — data.json and monthly *_backup.json files
