@@ -35,7 +35,7 @@ const PurchasePricePerKwh2025 = 0.25
 const PurchasePricePerKwh2026 = 0.25
 const JSONFileName = "data/data.json"
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
-const DataTTLMinutes = 60  // Auto-refresh data if older than this many minutes
+const DataTTLMinutes = 60     // Auto-refresh data if older than this many minutes
 const FetchTimeoutSeconds = 5 // Timeout for outbound API requests
 
 // httpClient is a shared HTTP client with an explicit timeout so that
@@ -77,14 +77,43 @@ type WattpilotEntry struct {
 	Link              string  `json:"link"`
 }
 
+type wattpilotAPIError struct {
+	Success *bool  `json:"success"`
+	Message string `json:"message"`
+	Error   string `json:"error"`
+}
+
 // ParseJSON takes a JSON document as input and returns a parsed representation of the JSON data.
 func ParseJSON(jsonData []byte) (WattpilotData, error) {
 	var parsedData WattpilotData
-	err := json.Unmarshal(jsonData, &parsedData)
-	if err != nil {
+	if err := json.Unmarshal(jsonData, &parsedData); err != nil {
 		return parsedData, fmt.Errorf("failed to parse JSON: %v", err)
 	}
-	return parsedData, nil
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(jsonData, &raw); err != nil {
+		return parsedData, fmt.Errorf("failed to inspect JSON payload: %v", err)
+	}
+
+	_, hasColumns := raw["columns"]
+	_, hasData := raw["data"]
+	if hasColumns && hasData {
+		return parsedData, nil
+	}
+
+	var apiErr wattpilotAPIError
+	if err := json.Unmarshal(jsonData, &apiErr); err == nil {
+		switch {
+		case apiErr.Message != "":
+			return parsedData, fmt.Errorf("wattpilot API error: %s", apiErr.Message)
+		case apiErr.Error != "":
+			return parsedData, fmt.Errorf("wattpilot API error: %s", apiErr.Error)
+		case apiErr.Success != nil && !*apiErr.Success:
+			return parsedData, fmt.Errorf("wattpilot API returned an unsuccessful response")
+		}
+	}
+
+	return parsedData, fmt.Errorf("invalid Wattpilot JSON payload: missing columns or data")
 }
 
 // FetchJSON fetches a JSON document from the specified URL.
@@ -467,7 +496,14 @@ func RefreshData(ctx context.Context) error {
 		return err
 	}
 
-	myUrl := PrepUrl(WattpilotDataUrl, "", "", key)
+	// Fetch all historical data by using date range from June 2024 to current month
+	firstMonth := "2024-06"
+	currentMonth := time.Now().Format("2006-01")
+	fromTimestamp := GetUnixTimestampStart(firstMonth)
+	toTimestamp := GetUnixTimestampEnd(currentMonth)
+
+	myUrl := PrepUrl(WattpilotDataUrl, fromTimestamp, toTimestamp, key)
+	slog.InfoContext(ctx, "Fetching Wattpilot data", "fromMonth", firstMonth, "toMonth", currentMonth)
 
 	// Fetch JSON document from the web
 	jsonData, err := FetchJSON(ctx, myUrl)

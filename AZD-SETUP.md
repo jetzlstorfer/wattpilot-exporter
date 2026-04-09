@@ -1,6 +1,6 @@
 # Azure Developer CLI (azd) Setup Guide
 
-This guide walks you through provisioning the wattpilot-exporter app on Azure using `azd`, including Azure Key Vault for the `WATTPILOT_KEY` secret.
+This guide walks you through provisioning the wattpilot-exporter app on Azure using `azd`, including Azure Key Vault and Azure Blob Storage.
 
 ## Prerequisites
 
@@ -64,7 +64,7 @@ This creates a local `.azure/` directory and links the project to `azure.yaml` a
 # Set the Azure region (available options: eastus, westus, swedencentral, etc.)
 azd env set AZURE_LOCATION swedencentral
 
-# Set the Wattpilot API key (this will be stored in Azure Key Vault)
+# Set the Wattpilot API key
 azd env set WATTPILOT_KEY <your-wattpilot-api-key>
 
 # Set Docker Hub credentials (required to push the container image)
@@ -88,11 +88,13 @@ azd provision
 This creates the following resources in Azure:
 - **Resource Group** — `rg-<environment-name>`
 - **Azure Key Vault** — securely stores `WATTPILOT_KEY` as a secret named `wattpilot-key`
+- **Azure Storage Account** — persists fetched charging data in Blob Storage
 - **Log Analytics Workspace** — collects container app logs and diagnostics
 - **Container Apps Environment** — managed hosting environment
 - **Container App** (`wattpilot`) — runs the Go application with:
-  - System-assigned **Managed Identity** (for accessing Key Vault)
-  - **Key Vault secret reference** for the `WATTPILOT_KEY` environment variable (no secrets in config)
+  - `WATTPILOT_KEY` resolved from **Azure Key Vault secret reference**
+  - User-assigned **Managed Identity** for Key Vault secret resolution
+  - System-assigned **Managed Identity** for Azure Blob Storage access
   - External ingress on port 8080 (publicly accessible)
   - Resource limits: 0.5 vCPU, 1Gi memory (smallest paid tier)
 
@@ -164,11 +166,11 @@ az containerapp logs show -n wattpilot -g rg-wattpilot-prod --follow
 # View recent logs (last 50 lines)
 az containerapp logs show -n wattpilot -g rg-wattpilot-prod --tail 50
 
-# Rotate the Wattpilot API key
+# Update the Wattpilot API key in Key Vault directly
 az keyvault secret set --vault-name $(azd env get-values | grep AZURE_KEY_VAULT_NAME | cut -d= -f2 | tr -d '"') --name wattpilot-key --value <new-key>
 
-# Restart the container app to pick up updated secrets
-az containerapp revision restart -n wattpilot -g $(azd env get-values | grep AZURE_RESOURCE_GROUP | cut -d= -f2 | tr -d '"')
+# Restart active revision to pick up updated secret version
+az containerapp revision list -n wattpilot -g $(azd env get-values | grep AZURE_RESOURCE_GROUP | cut -d= -f2 | tr -d '"') --query "[?properties.active].name" -o tsv | xargs -I {} az containerapp revision restart -n wattpilot -g $(azd env get-values | grep AZURE_RESOURCE_GROUP | cut -d= -f2 | tr -d '"') --revision {}
 
 # Delete all Azure resources and local environment
 azd down
@@ -185,20 +187,18 @@ rm -rf .azure/wattpilot-prod
 │                                                 │
 │  ┌──────────────┐     ┌──────────────────────┐  │
 │  │  Key Vault   │────▶│  Container App       │  │
-│  │              │     │  (wattpilot)         │  │
-│  │  wattpilot-  │     │                      │  │
-│  │  key         │     │  WATTPILOT_KEY       │  │
-│  │  (secret)    │◀────│  = secretRef →       │  │
-│  │              │ RBAC│    Key Vault ref      │  │
-│  └──────────────┘     │                      │  │
-│                       │  Managed Identity    │  │
-│                       │  (system-assigned)   │  │
-│                       └──────────────────────┘  │
+│  │  (secret)    │     │  (wattpilot)         │  │
+│  └──────────────┘     │  WATTPILOT_KEY       │  │
+│                       │  via secretRef       │  │
+│  ┌──────────────┐◀────│  Blob Storage        │  │
+│  │  Blob        │ RBAC│  access via MSI      │  │
+│  │  Storage     │     │                      │  │
+│  └──────────────┘     └──────────────────────┘  │
 │                                                 │
 └─────────────────────────────────────────────────┘
 ```
 
-The Container App uses a **system-assigned managed identity** with the **Key Vault Secrets User** RBAC role. The `WATTPILOT_KEY` environment variable is injected at runtime via a Key Vault secret reference — no secrets are stored in app configuration or source code.
+The Container App uses a **user-assigned managed identity** with the **Key Vault Secrets User** RBAC role for resolving the `WATTPILOT_KEY` secret reference at runtime, and a **system-assigned managed identity** with **Storage Blob Data Contributor** for persisted data.
 
 ## Architecture of provisioned resources
 
@@ -207,10 +207,13 @@ The Container App uses a **system-assigned managed identity** with the **Key Vau
 | Resource Group | Groups all resources together | `infra/main.bicep` |
 | Log Analytics Workspace | Collects container app logs and diagnostics | `infra/modules/log-analytics.bicep` |
 | Azure Key Vault | Securely stores secrets (e.g., `WATTPILOT_KEY`) | `infra/modules/key-vault.bicep` |
+| Storage Account | Stores `data/data.json` and monthly backup blobs | `infra/modules/storage-account.bicep` |
 | Container Apps Environment | Managed hosting environment for containers | `infra/modules/container-apps-env.bicep` |
 | Container App (`wattpilot`) | Runs the Go web application on port 8080 | `infra/modules/container-app.bicep` |
-| Managed Identity | System-assigned identity for the Container App | `infra/modules/container-app.bicep` |
-| RBAC Role Assignment | Grants `Key Vault Secrets User` role to the Managed Identity | `infra/modules/key-vault-access.bicep` |
+| Managed Identity (User-assigned) | Resolves Key Vault secret references for Container App secrets | `infra/modules/user-assigned-identity.bicep` |
+| Managed Identity (System-assigned) | Accesses Blob storage from application code | `infra/modules/container-app.bicep` |
+| RBAC Role Assignment | Grants `Key Vault Secrets User` role to user-assigned identity | `infra/modules/key-vault-access.bicep` |
+| RBAC Role Assignment | Grants Blob access to the Managed Identity | `infra/modules/storage-account-access.bicep` |
 
 ## Resource Cost
 
@@ -218,7 +221,7 @@ The deployment uses:
 - **Container Apps**: 0.5 vCPU + 1Gi memory (smallest paid tier) — ~$10-15/month
 - **Key Vault**: Standard tier — ~$0.60/month + access charges
 - **Log Analytics**: Pay-per-GB ingestion — typically <$1/month for low-traffic app
-- **Storage**: Minimal (Key Vault secrets only)
+- **Storage**: Small Blob storage cost for cached JSON data
 
 Total estimated cost: **~$15-20/month**
 
@@ -232,7 +235,9 @@ az containerapp logs show -n wattpilot -g rg-wattpilot-prod --follow
 ```
 
 Common issues:
-- `WATTPILOT_KEY` not set in Key Vault — run `azd env set WATTPILOT_KEY <key>` and redeploy
+- `WATTPILOT_KEY` not set in the azd environment — run `azd env set WATTPILOT_KEY <key>` and redeploy
+- Key Vault secret not readable — verify the user-assigned identity has `Key Vault Secrets User` on the vault
+- Blob access errors on startup — verify the Container App managed identity has `Storage Blob Data Contributor` on the storage account
 - Application crashes on startup — check logs above
 
 ### Docker push fails with "denied"

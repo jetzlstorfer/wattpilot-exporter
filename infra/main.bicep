@@ -71,6 +71,17 @@ module containerAppsEnv 'modules/container-apps-env.bicep' = {
   }
 }
 
+// User-assigned managed identity used by Container App to resolve Key Vault secrets
+module keyVaultIdentity 'modules/user-assigned-identity.bicep' = {
+  name: 'key-vault-identity'
+  scope: rg
+  params: {
+    name: 'id-wattpilot-kv-${environmentName}'
+    location: location
+    tags: tags
+  }
+}
+
 // Container App
 module containerApp 'modules/container-app.bicep' = {
   name: 'container-app'
@@ -82,6 +93,7 @@ module containerApp 'modules/container-app.bicep' = {
     containerAppsEnvironmentId: containerAppsEnv.outputs.id
     containerImage: containerImage
     keyVaultSecretUri: keyVault.outputs.secretUri
+    keyVaultIdentityResourceId: keyVaultIdentity.outputs.id
     dockerUsername: dockerUsername
     dockerPassword: dockerPassword
     storageAccountName: storageAccount.outputs.name
@@ -99,13 +111,13 @@ module storageAccount 'modules/storage-account.bicep' = {
   }
 }
 
-// Grant the Container App's managed identity access to Key Vault
+// Grant the Key Vault identity access to read secrets
 module keyVaultAccess 'modules/key-vault-access.bicep' = {
   name: 'key-vault-access'
   scope: rg
   params: {
     keyVaultName: keyVault.outputs.name
-    principalId: containerApp.outputs.identityPrincipalId
+    principalId: keyVaultIdentity.outputs.principalId
   }
 }
 

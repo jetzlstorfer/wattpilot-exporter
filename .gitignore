@@ -33,6 +33,6 @@ data/data.json
 data/*_backup.json
 *ladeabrechnung.xlsx
 
-# old src/ layout (can be removed after full migration)
-src/
-
+# bicep generated files
+*.bicep.*
+infra/main.json

@@ -4,6 +4,7 @@ param tags object = {}
 param containerAppsEnvironmentId string
 param containerImage string
 param keyVaultSecretUri string
+param keyVaultIdentityResourceId string
 param dockerUsername string = ''
 @secure()
 param dockerPassword string = ''
@@ -16,7 +17,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   location: location
   tags: union(tags, { 'azd-service-name': 'wattpilot' })
   identity: {
-    type: 'SystemAssigned'
+    type: 'SystemAssigned,UserAssigned'
+    userAssignedIdentities: {
+      '${keyVaultIdentityResourceId}': {}
+    }
   }
   properties: {
     managedEnvironmentId: containerAppsEnvironmentId
@@ -32,7 +36,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         {
           name: 'wattpilot-key'
           keyVaultUrl: keyVaultSecretUri
-          identity: 'system'
+          identity: keyVaultIdentityResourceId
         }
         ...(hasDockerCredentials ? [
           {

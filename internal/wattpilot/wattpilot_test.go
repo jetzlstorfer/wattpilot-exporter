@@ -41,7 +41,6 @@ func TestFetchJSON_TimesOut(t *testing.T) {
 	}
 }
 
-
 func TestRoundFloat(t *testing.T) {
 	tests := []struct {
 		val       float64
@@ -69,9 +68,9 @@ func TestGetPrevMonth(t *testing.T) {
 		want  string
 	}{
 		{"2024-07", "2024-06"},
-		{"2024-06", ""},        // lower bound
+		{"2024-06", ""}, // lower bound
 		{"2025-01", "2024-12"},
-		{"2024-05", ""},        // before data start
+		{"2024-05", ""}, // before data start
 	}
 	for _, tt := range tests {
 		got := GetPrevMonth(tt.input)
@@ -224,6 +223,23 @@ func TestParseJSON_Invalid(t *testing.T) {
 	_, err := ParseJSON([]byte(`{invalid json`))
 	if err == nil {
 		t.Error("ParseJSON should fail on invalid JSON")
+	}
+}
+
+func TestParseJSON_APIErrorPayload(t *testing.T) {
+	_, err := ParseJSON([]byte(`{"success":false,"message":"Cannot parse key"}`))
+	if err == nil {
+		t.Fatal("ParseJSON should fail on Wattpilot API error payloads")
+	}
+	if !contains(err.Error(), "Cannot parse key") {
+		t.Fatalf("expected API error message to be preserved, got %v", err)
+	}
+}
+
+func TestParseJSON_MissingExpectedFields(t *testing.T) {
+	_, err := ParseJSON([]byte(`{"foo":"bar"}`))
+	if err == nil {
+		t.Fatal("ParseJSON should fail when columns/data are missing")
 	}
 }
 
