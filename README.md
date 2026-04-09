@@ -131,6 +131,31 @@ azd env get-values | grep AZURE_CONTAINER_APP_FQDN
 
 See [AZD-SETUP.md](AZD-SETUP.md) for detailed Azure deployment instructions.
 
+### CI/CD (GitHub Actions)
+
+The repository includes a GitHub Actions workflow (`.github/workflows/deploy-container-app.yml`) that automatically deploys to Azure Container Apps on every push to `main`.
+
+**What it does:**
+- **On pull requests:** builds the Docker image without pushing (validation only)
+- **On push to `main`:** authenticates to Azure via OIDC, logs into Docker Hub, and runs `azd deploy`
+
+**Required repository secrets:**
+
+| Secret | Description |
+|---|---|
+| `WATTPILOT_AZURE_CLIENT_ID` | Azure AD app registration client ID (with OIDC federation) |
+| `WATTPILOT_AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
+| `WATTPILOT_AZURE_TENANT_ID` | Azure AD tenant ID |
+| `WATTPILOT_REGISTRY_USERNAME` | Docker Hub username |
+| `WATTPILOT_REGISTRY_PASSWORD` | Docker Hub access token |
+
+**Azure OIDC setup:**
+
+The workflow uses [workload identity federation](https://learn.microsoft.com/entra/workload-id/workload-identity-federation) (no stored client secrets). The Azure AD app registration must have a federated credential with:
+- **Issuer:** `https://token.actions.githubusercontent.com`
+- **Subject:** `repo:jetzlstorfer/wattpilot-exporter:ref:refs/heads/main`
+- **Audience:** `api://AzureADTokenExchange`
+
 ## Routes
 
 | Route | Description |

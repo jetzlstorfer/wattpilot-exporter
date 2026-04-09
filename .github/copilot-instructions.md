@@ -99,6 +99,15 @@ azd deploy                            # Build image, push to Docker Hub, update 
 
 See [AZD-SETUP.md](AZD-SETUP.md) for detailed instructions.
 
+### CI/CD (GitHub Actions)
+
+The repository uses a GitHub Actions workflow (`.github/workflows/deploy-container-app.yml`) for automated deployment:
+
+- **PR validation:** builds Docker image without pushing
+- **Deploy on push to `main`:** authenticates via Azure OIDC + `azd auth login --federated-credential-provider github`, logs into Docker Hub via `docker/login-action`, then runs `azd deploy`
+- **Authentication:** uses workload identity federation (OIDC) — no client secrets stored. The federated credential subject is `repo:jetzlstorfer/wattpilot-exporter:ref:refs/heads/main`
+- **Required secrets:** `WATTPILOT_AZURE_CLIENT_ID`, `WATTPILOT_AZURE_SUBSCRIPTION_ID`, `WATTPILOT_AZURE_TENANT_ID`, `WATTPILOT_REGISTRY_USERNAME`, `WATTPILOT_REGISTRY_PASSWORD`
+
 ### Infrastructure:
 - **Resource Group**: Groups all resources
 - **Container Apps Environment**: Managed hosting environment  
