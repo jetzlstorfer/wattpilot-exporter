@@ -24,7 +24,8 @@ param dockerUsername string = ''
 param dockerPassword string = ''
 
 var abbrs = loadJsonContent('abbreviations.json')
-var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
+// Storage accounts don't allow hyphens; strip them from the environment name
+var cleanEnvironmentName = replace(environmentName, '-', '')
 var tags = { 'azd-env-name': environmentName }
 
 // Resource Group
@@ -39,7 +40,7 @@ module logAnalytics 'modules/log-analytics.bicep' = {
   name: 'log-analytics'
   scope: rg
   params: {
-    name: '${abbrs.logAnalyticsWorkspace}${resourceToken}'
+    name: '${abbrs.logAnalyticsWorkspace}${environmentName}'
     location: location
     tags: tags
   }
@@ -50,7 +51,7 @@ module keyVault 'modules/key-vault.bicep' = {
   name: 'key-vault'
   scope: rg
   params: {
-    name: '${abbrs.keyVault}${resourceToken}'
+    name: '${abbrs.keyVault}${environmentName}'
     location: location
     tags: tags
     secretName: 'wattpilot-key'
@@ -63,7 +64,7 @@ module containerAppsEnv 'modules/container-apps-env.bicep' = {
   name: 'container-apps-env'
   scope: rg
   params: {
-    name: '${abbrs.containerAppsEnvironment}${resourceToken}'
+    name: '${abbrs.containerAppsEnvironment}${environmentName}'
     location: location
     tags: tags
     logAnalyticsWorkspaceId: logAnalytics.outputs.id
@@ -92,7 +93,7 @@ module storageAccount 'modules/storage-account.bicep' = {
   name: 'storage-account'
   scope: rg
   params: {
-    name: '${abbrs.storageAccount}${resourceToken}'
+    name: '${abbrs.storageAccount}${cleanEnvironmentName}'
     location: location
     tags: tags
   }
