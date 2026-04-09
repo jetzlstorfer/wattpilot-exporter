@@ -33,6 +33,7 @@ wattpilot-exporter/
       telemetry.go                 # OpenTelemetry initialisation
   internal/
     wattpilot/
+      storage.go                   # storage abstraction (local filesystem / Azure Blob)
       wattpilot.go                 # core data layer: types, API client, caching, pricing
       wattpilot_test.go            # unit tests for pricing, dates, parsing
     handlers/
@@ -57,9 +58,10 @@ This is a Go web application that fetches EV charging session data from the Fron
 - **`internal/handlers/dashboard.go`** — `/` (dashboard) and `/refresh` handlers
 - **`internal/handlers/charts.go`** — `/charts` handler aggregating month-over-month statistics
 - **`internal/handlers/download.go`** — `/download` handler generating Excel (`.xlsx`) reports via excelize
-- **`internal/wattpilot/wattpilot.go`** — Core data layer: API client, JSON caching, date parsing, price calculation
+- **`internal/wattpilot/storage.go`** — Storage abstraction + backend selection (local filesystem or Azure Blob)
+- **`internal/wattpilot/wattpilot.go`** — Core data layer: API client, JSON caching/refresh, backup fallback, date parsing, price calculation
 
-Data flows: Wattpilot API → `data/data.json` (local cache) → parsed in-memory → filtered by month → rendered to HTML templates or Excel.
+Data flows: Wattpilot API → active data store (`data/data.json` in local mode or Blob in Azure mode) → parsed in-memory → filtered by month → rendered to HTML templates or Excel.
 
 The server uses Go's `net/http` standard library with `html/template` for rendering (no web framework). Static assets (Chart.js, Tailwind CSS) are served from `static/`.
 
@@ -68,6 +70,8 @@ The server uses Go's `net/http` standard library with `html/template` for render
 - **Dates from the Wattpilot API** use European format and are parsed with Go layout `"02.01.2006 15:04:05"`. Month navigation uses `"2006-01"` format.
 - **Electricity prices** are hardcoded per year as constants in `internal/wattpilot/wattpilot.go` (e.g., `OfficialPricePerKwh2025`). When a new year's rate is published, add a new constant and update the switch statements in `getSellingPriceOfYear`, `getPurchasePriceOfYear`, and `GetOfficialPricePerKwhForMonth`.
 - **Data caching** — The app fetches from the API once and saves to `data/data.json`. Subsequent requests use the cache. Monthly snapshots are written to `data/*_backup.json`. Hit `/refresh` to re-fetch. The `make run` target deletes the cache before starting.
+- **Storage backend selection** — If `AZURE_STORAGE_ACCOUNT_NAME` is set, the app uses Azure Blob Storage with `DefaultAzureCredential` (managed identity in Azure, `az login` locally). Otherwise, it uses local filesystem storage under `data/`.
+- **Refresh safety** — Outbound Wattpilot API requests use a 5-second timeout and fetched payloads are validated before overwrite. On refresh failure, existing cached data is preserved and monthly backups remain available.
 - **Historical data starts from June 2024** — `GetPrevMonth` enforces this lower bound.
 - **`internal/` packages** are not importable by external code — this is intentional as this is an application, not a library.
 
@@ -77,7 +81,7 @@ The application is deployed to **Azure Container Apps** using:
 
 - **Infrastructure as Code**: Bicep templates in `infra/` (see `infra/main.bicep` and modules)
 - **Azure Developer CLI**: Configuration in `azure.yaml` for automated provisioning and deployment
-- **Secrets Management**: `WATTPILOT_KEY` stored securely in **Azure Key Vault**; the Container App uses a system-assigned managed identity to access it
+- **Secrets Management**: `WATTPILOT_KEY` stored securely in **Azure Key Vault**; the Container App uses a user-assigned managed identity for Key Vault secret resolution
 - **Container Build & Push**: `azd deploy` builds the Docker image and pushes it to the Docker Hub repository `jetzlstorfer/wattpilot-exporter` using a timestamp-based image tag per deployment, then updates the Container App to use the new image
 
 ### Deployment workflow:
@@ -100,8 +104,9 @@ See [AZD-SETUP.md](AZD-SETUP.md) for detailed instructions.
 - **Container Apps Environment**: Managed hosting environment  
 - **Container App**: Runs the Go app (0.5 vCPU, 1Gi memory) on port 8080
 - **Key Vault**: Stores `WATTPILOT_KEY` secret
+- **Storage Account (Blob)**: Stores `data.json` and monthly backup data in Azure-hosted deployments
 - **Log Analytics Workspace**: Collects container logs
-- **Managed Identity**: RBAC access to Key Vault
+- **Managed Identities**: User-assigned identity for Key Vault secret resolution and system-assigned identity for Blob Storage RBAC access
 
 ## Pull Request Guidelines
 
