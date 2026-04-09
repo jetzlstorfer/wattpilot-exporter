@@ -92,6 +92,8 @@ make docker-run
 
 This project is configured for deployment to **Azure Container Apps** using the **Azure Developer CLI (azd)**.
 
+`WATTPILOT_KEY` is stored in **Azure Key Vault** and consumed by the Container App via a Key Vault secret reference.
+
 **Prerequisites:**
 - [Azure Developer CLI (`azd`)](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/)
 - [Azure CLI (`az`)](https://learn.microsoft.com/en-us/cli/azure/)

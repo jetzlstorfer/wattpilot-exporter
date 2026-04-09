@@ -1,59 +1,57 @@
-name: Build and deploy on Azure container apps
+name: Build and Deploy with AZD
 
 # When this action will be executed
 on:
-  # Automatically trigger it when detected changes in repo
   push:
-    branches: 
-      [ main ]
-  pull_request_target:
-    branches: 
-      [ main ]
-  # Allow manually trigger 
-  workflow_dispatch:      
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
-  id-token: write # This is required for requesting the JWT
-  contents: read  # This is required for actions/checkout
+  id-token: write
+  contents: read
 
 
 jobs:
-  build:
+  validate:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
-      #- name: Checkout to the branch
-      #  uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v3
 
-      - name: Log in to container registry
-        uses: docker/login-action@v4
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
         with:
-          registry: docker.io
-          username: ${{ secrets.WATTPILOT_REGISTRY_USERNAME }}
-          password: ${{ secrets.WATTPILOT_REGISTRY_PASSWORD }}
-
-      - name: Build and push container image to registry
-        uses: docker/build-push-action@v7
-        with:
-          push: true
-          tags: jetzlstorfer/wattpilot-export:${{ github.sha }}
-          build-args: GIT_SHA=${{ github.sha }}
-          context: "{{defaultContext}}"
-
+          push: false
+          tags: jetzlstorfer/wattpilot-export:pr-${{ github.sha }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          context: .
 
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    needs: build
+    environment: production
     
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install AZD
+        uses: Azure/setup-azd@v2
+
       - name: Azure Login
         uses: azure/login@v3
         with:
@@ -61,12 +59,13 @@ jobs:
           subscription-id: ${{ secrets.WATTPILOT_AZURE_SUBSCRIPTION_ID }}
           tenant-id: ${{ secrets.WATTPILOT_AZURE_TENANT_ID }}
 
-
-
-      - name: Deploy to containerapp
-        uses: azure/CLI@v3
+      - name: Deploy via AZD (deploy only)
+        uses: azure/CLI@v2
         with:
           inlineScript: |
             az config set extension.use_dynamic_install=yes_without_prompt
-            az containerapp registry set -n wattpilot -g aca-wattpilot --server docker.io --username  ${{ secrets.WATTPILOT_REGISTRY_USERNAME }} --password ${{ secrets.WATTPILOT_REGISTRY_PASSWORD }}
-            az containerapp update -n wattpilot -g aca-wattpilot --image jetzlstorfer/wattpilot-export:${{ github.sha }}
+            azd env new wattpilot-prod --no-prompt
+            azd env set AZURE_SUBSCRIPTION_ID ${{ secrets.WATTPILOT_AZURE_SUBSCRIPTION_ID }}
+            azd env set DOCKER_USERNAME ${{ secrets.WATTPILOT_REGISTRY_USERNAME }}
+            azd env set DOCKER_PASSWORD ${{ secrets.WATTPILOT_REGISTRY_PASSWORD }}
+            azd deploy --no-prompt
