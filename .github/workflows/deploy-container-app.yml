@@ -61,10 +61,17 @@ jobs:
       - name: AZD Login
         run: azd auth login --client-id ${{ secrets.WATTPILOT_AZURE_CLIENT_ID }} --federated-credential-provider github --tenant-id ${{ secrets.WATTPILOT_AZURE_TENANT_ID }}
 
+      - name: Docker Hub Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.WATTPILOT_REGISTRY_USERNAME }}
+          password: ${{ secrets.WATTPILOT_REGISTRY_PASSWORD }}
+
       - name: Deploy via AZD (deploy only)
         run: |
           azd env new wattpilot-prod --no-prompt
           azd env set AZURE_SUBSCRIPTION_ID ${{ secrets.WATTPILOT_AZURE_SUBSCRIPTION_ID }}
+          azd env set AZURE_LOCATION swedencentral
           azd env set DOCKER_USERNAME ${{ secrets.WATTPILOT_REGISTRY_USERNAME }}
           azd env set DOCKER_PASSWORD ${{ secrets.WATTPILOT_REGISTRY_PASSWORD }}
           azd deploy --no-prompt
