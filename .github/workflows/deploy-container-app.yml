@@ -59,12 +59,9 @@ jobs:
           tenant-id: ${{ secrets.WATTPILOT_AZURE_TENANT_ID }}
 
       - name: Deploy via AZD (deploy only)
-        uses: azure/CLI@v2
-        with:
-          inlineScript: |
-            az config set extension.use_dynamic_install=yes_without_prompt
-            azd env new wattpilot-prod --no-prompt
-            azd env set AZURE_SUBSCRIPTION_ID ${{ secrets.WATTPILOT_AZURE_SUBSCRIPTION_ID }}
-            azd env set DOCKER_USERNAME ${{ secrets.WATTPILOT_REGISTRY_USERNAME }}
-            azd env set DOCKER_PASSWORD ${{ secrets.WATTPILOT_REGISTRY_PASSWORD }}
-            azd deploy --no-prompt
+        run: |
+          azd env new wattpilot-prod --no-prompt
+          azd env set AZURE_SUBSCRIPTION_ID ${{ secrets.WATTPILOT_AZURE_SUBSCRIPTION_ID }}
+          azd env set DOCKER_USERNAME ${{ secrets.WATTPILOT_REGISTRY_USERNAME }}
+          azd env set DOCKER_PASSWORD ${{ secrets.WATTPILOT_REGISTRY_PASSWORD }}
+          azd deploy --no-prompt
