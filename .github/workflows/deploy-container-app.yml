@@ -32,7 +32,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build image (no push)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           push: false
           tags: jetzlstorfer/wattpilot-export:pr-${{ github.sha }}
