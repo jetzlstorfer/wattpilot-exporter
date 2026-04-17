@@ -1,122 +1,53 @@
 # Copilot Instructions
 
-## Build & Run
+## Build, Test & Run
 
-All commands are run from the **repository root** (where `go.mod` lives):
+All commands run from the repository root:
 
 ```bash
-go run ./cmd/server       # start the server on :8080
-make run                  # delete cached data/data.json, then run
-make run-cached           # run using cached data/data.json
-make build                # compile binary
-make docker-build         # build Docker image
-make docker-run           # run Docker container (needs .env)
-go test ./...             # run all tests
+go run ./cmd/server          # start the server on :8080
+make run                     # delete cached data/data.json, then run
+make run-cached              # run using cached data/data.json
+make build                   # compile binary
+go test ./...                # run all tests
+go test ./internal/wattpilot # run tests for a single package
+go test ./internal/wattpilot -run TestCalculatePrice  # run a single test
 ```
 
-A `WATTPILOT_KEY` environment variable is required. Place it in `.env` at the repo root.
-
-## Project Layout
-
-```
-wattpilot-exporter/
-  go.mod                           # module root
-  Makefile
-  Dockerfile
-  azure.yaml
-  .env.example                     # example environment variables
-  .devcontainer/                   # VS Code Dev Container configuration
-  assets/                          # static assets for documentation (e.g. screenshots)
-  cmd/
-    server/
-      main.go                      # entrypoint — server wiring, signal handling
-      telemetry.go                 # OpenTelemetry initialisation
-  internal/
-    wattpilot/
-      storage.go                   # storage abstraction (local filesystem / Azure Blob)
-      wattpilot.go                 # core data layer: types, API client, caching, pricing
-      wattpilot_test.go            # unit tests for pricing, dates, parsing
-    handlers/
-      dashboard.go                 # GET / — main dashboard handler + types
-      charts.go                    # GET /charts — monthly aggregation handler
-      download.go                  # GET /download — Excel report generation
-  templates/                       # HTML templates (html/template)
-    template.html
-    charts.html
-    info.html
-  static/                          # client-side assets (CSS, JS, icons, PWA manifest)
-  data/                            # runtime cache — gitignored
-  infra/                           # Azure Bicep IaC
-```
+A `WATTPILOT_KEY` environment variable is required. Place it in `.env` at the repo root (see `.env.example`).
 
 ## Architecture
 
-This is a Go web application that fetches EV charging session data from the Fronius Wattpilot API, calculates monthly costs using official Austrian electricity rates, and serves an HTML dashboard.
+Go web application that fetches EV charging session data from the Fronius Wattpilot API, calculates monthly costs using official Austrian electricity rates, and serves an HTML dashboard.
 
-- **`cmd/server/main.go`** — HTTP server setup, route registration, graceful shutdown
-- **`cmd/server/telemetry.go`** — OpenTelemetry trace + log provider initialisation
-- **`internal/handlers/dashboard.go`** — `/` (dashboard) and `/refresh` handlers
-- **`internal/handlers/charts.go`** — `/charts` handler aggregating month-over-month statistics
-- **`internal/handlers/download.go`** — `/download` handler generating Excel (`.xlsx`) reports via excelize
-- **`internal/wattpilot/storage.go`** — Storage abstraction + backend selection (local filesystem or Azure Blob)
-- **`internal/wattpilot/wattpilot.go`** — Core data layer: API client, JSON caching/refresh, backup fallback, date parsing, price calculation
+**Data flow:** Wattpilot API → `data/data.json` (local) or Azure Blob → parsed in-memory → filtered by month → rendered to HTML templates or Excel.
 
-Data flows: Wattpilot API → active data store (`data/data.json` in local mode or Blob in Azure mode) → parsed in-memory → filtered by month → rendered to HTML templates or Excel.
-
-The server uses Go's `net/http` standard library with `html/template` for rendering (no web framework). Static assets (Chart.js, Tailwind CSS) are served from `static/`.
+- Uses Go's `net/http` standard library with `html/template` — no web framework.
+- **`internal/wattpilot/wattpilot.go`** — Core data layer: API client, JSON caching/refresh, backup fallback, date parsing, price calculation.
+- **`internal/wattpilot/storage.go`** — `DataStore` interface with two backends: `LocalStore` (filesystem) and `AzureBlobStore`. Selected at startup via `InitStore()` based on `AZURE_STORAGE_ACCOUNT_NAME`.
+- **`internal/handlers/`** — HTTP handlers for dashboard (`/`), charts (`/charts`), Excel download (`/download`), refresh (`/refresh`).
+- **`cmd/server/telemetry.go`** — OpenTelemetry trace + log provider initialisation. Logs use `slog` bridged to OTel.
+- Static assets (Chart.js, Tailwind CSS) are served from `static/`. HTML templates live in `templates/`.
 
 ## Key Conventions
 
-- **Dates from the Wattpilot API** use European format and are parsed with Go layout `"02.01.2006 15:04:05"`. Month navigation uses `"2006-01"` format.
-- **Electricity prices** are hardcoded per year as constants in `internal/wattpilot/wattpilot.go` (e.g., `OfficialPricePerKwh2025`). When a new year's rate is published, add a new constant and update the switch statements in `getSellingPriceOfYear`, `getPurchasePriceOfYear`, and `GetOfficialPricePerKwhForMonth`.
-- **Data caching** — The app fetches from the API once and saves to `data/data.json`. Subsequent requests use the cache. Monthly snapshots are written to `data/*_backup.json`. Hit `/refresh` to re-fetch. The `make run` target deletes the cache before starting.
-- **Storage backend selection** — If `AZURE_STORAGE_ACCOUNT_NAME` is set, the app uses Azure Blob Storage with `DefaultAzureCredential` (managed identity in Azure, `az login` locally). Otherwise, it uses local filesystem storage under `data/`.
-- **Refresh safety** — Outbound Wattpilot API requests use a 5-second timeout and fetched payloads are validated before overwrite. On refresh failure, existing cached data is preserved and monthly backups remain available.
+- **Date parsing** — Wattpilot API dates use European format, parsed with Go layout `"02.01.2006 15:04:05"`. Month navigation uses `"2006-01"` format throughout.
+- **Electricity prices** — Hardcoded per year as constants in `internal/wattpilot/wattpilot.go` (e.g., `OfficialPricePerKwh2025`, `PurchasePricePerKwh2025`). When adding a new year's rate: add constants, then update the switch statements in `getSellingPriceOfYear`, `getPurchasePriceOfYear`, and `GetOfficialPricePerKwhForMonth`.
+- **Data caching** — The app fetches from the API once and saves to `data/data.json`. Monthly snapshots are written to `data/data-YYYY-MM_backup.json`. Auto-refresh triggers when data is older than `DataTTLMinutes` (60 min). Hit `/refresh` to force re-fetch.
+- **Refresh safety** — Fetched payloads are parsed/validated before overwriting `data.json`. On failure, existing cached data is preserved and monthly backups remain available. Writes use atomic temp-file + rename.
 - **Historical data starts from June 2024** — `GetPrevMonth` enforces this lower bound.
-- **`internal/` packages** are not importable by external code — this is intentional as this is an application, not a library.
+- **Observability** — Handlers and core functions create OTel spans via package-level `tracer` variables. Use `slog.InfoContext`/`slog.ErrorContext` (not `log.Printf`) for structured logging.
+- **Tests** — Use table-driven tests with `[]struct` patterns. Tests live alongside code in `_test.go` files within the same package (not a separate `_test` package).
 
 ## Azure Deployment
 
-The application is deployed to **Azure Container Apps** using:
+Deployed to Azure Container Apps via Azure Developer CLI (`azd`). See [AZD-SETUP.md](AZD-SETUP.md) for full setup. Key points:
 
-- **Infrastructure as Code**: Bicep templates in `infra/` (see `infra/main.bicep` and modules)
-- **Azure Developer CLI**: Configuration in `azure.yaml` for automated provisioning and deployment
-- **Secrets Management**: `WATTPILOT_KEY` stored securely in **Azure Key Vault**; the Container App uses a user-assigned managed identity for Key Vault secret resolution
-- **Container Build & Push**: `azd deploy` builds the Docker image and pushes it to the Docker Hub repository `jetzlstorfer/wattpilot-exporter` using a timestamp-based image tag per deployment, then updates the Container App to use the new image
-
-### Deployment workflow:
-
-```bash
-cd /path/to/repo
-azd init -e <environment-name>        # Initialize environment
-azd env set AZURE_LOCATION swedencentral
-azd env set WATTPILOT_KEY <api-key>
-azd env set DOCKER_USERNAME <username>
-azd env set DOCKER_PASSWORD <token>
-azd provision                         # Create Azure resources
-azd deploy                            # Build image, push to Docker Hub, update Container App
-```
-
-See [AZD-SETUP.md](AZD-SETUP.md) for detailed instructions.
-
-### CI/CD (GitHub Actions)
-
-The repository uses a GitHub Actions workflow (`.github/workflows/deploy-container-app.yml`) for automated deployment:
-
-- **PR validation:** builds Docker image without pushing
-- **Deploy on push to `main`:** authenticates via Azure OIDC + `azd auth login --federated-credential-provider github`, logs into Docker Hub via `docker/login-action`, then runs `azd deploy`
-- **Authentication:** uses workload identity federation (OIDC) — no client secrets stored. The federated credential subject is `repo:jetzlstorfer/wattpilot-exporter:ref:refs/heads/main`
-- **Required secrets:** `WATTPILOT_AZURE_CLIENT_ID`, `WATTPILOT_AZURE_SUBSCRIPTION_ID`, `WATTPILOT_AZURE_TENANT_ID`, `WATTPILOT_REGISTRY_USERNAME`, `WATTPILOT_REGISTRY_PASSWORD`
-
-### Infrastructure:
-- **Resource Group**: Groups all resources
-- **Container Apps Environment**: Managed hosting environment  
-- **Container App**: Runs the Go app (0.5 vCPU, 1Gi memory) on port 8080
-- **Key Vault**: Stores `WATTPILOT_KEY` secret
-- **Storage Account (Blob)**: Stores `data.json` and monthly backup data in Azure-hosted deployments
-- **Log Analytics Workspace**: Collects container logs
-- **Managed Identities**: User-assigned identity for Key Vault secret resolution and system-assigned identity for Blob Storage RBAC access
+- Infrastructure as Code: Bicep templates in `infra/`.
+- `WATTPILOT_KEY` stored in Azure Key Vault; consumed via managed identity.
+- `azd deploy` builds the Docker image, pushes to Docker Hub (`jetzlstorfer/wattpilot-exporter`), and updates the Container App.
+- CI/CD: `.github/workflows/deploy-container-app.yml` — PR validation builds the image; push to `main` deploys via Azure OIDC (workload identity federation).
 
 ## Pull Request Guidelines
 
-- **Always add screenshots** to every pull request that includes UI or visual changes. Place screenshot images in the `assets/` directory and embed them in the PR description. This helps reviewers verify that the UI looks correct without having to run the application locally.
+- **Always add screenshots** to every pull request that includes UI or visual changes. Place screenshot images in the `assets/` directory and embed them in the PR description.
