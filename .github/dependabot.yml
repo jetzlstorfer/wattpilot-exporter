@@ -4,13 +4,25 @@ updates:
     directory: "/src"
     schedule:
       interval: "weekly"
+    groups:
+      gomod-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: "docker"
     directory: "/src"
     schedule:
       interval: "weekly"
+    groups:
+      docker-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      github-actions-all:
+        patterns:
+          - "*"
