@@ -67,23 +67,16 @@ jobs:
           username: ${{ secrets.WATTPILOT_REGISTRY_USERNAME }}
           password: ${{ secrets.WATTPILOT_REGISTRY_PASSWORD }}
 
-      - name: Deploy via AZD (provision + deploy)
+      - name: Deploy via AZD (deploy only)
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.WATTPILOT_AZURE_SUBSCRIPTION_ID }}
-          WATTPILOT_KEY: ${{ secrets.WATTPILOT_KEY }}
           DOCKER_USERNAME: ${{ secrets.WATTPILOT_REGISTRY_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.WATTPILOT_REGISTRY_PASSWORD }}
-          ENTRA_CLIENT_ID: ${{ secrets.ENTRA_CLIENT_ID }}
-          ENTRA_CLIENT_SECRET: ${{ secrets.ENTRA_CLIENT_SECRET }}
         run: |
           set -euo pipefail
 
           if [[ -z "$AZURE_SUBSCRIPTION_ID" ]]; then
             echo "Missing required secret: WATTPILOT_AZURE_SUBSCRIPTION_ID" >&2
-            exit 1
-          fi
-          if [[ -z "$WATTPILOT_KEY" ]]; then
-            echo "Missing required secret: WATTPILOT_KEY" >&2
             exit 1
           fi
           if [[ -z "$DOCKER_USERNAME" ]]; then
@@ -98,12 +91,6 @@ jobs:
           azd env new wattpilot-prod --no-prompt
           azd env set AZURE_SUBSCRIPTION_ID "$AZURE_SUBSCRIPTION_ID"
           azd env set AZURE_LOCATION swedencentral
-          azd env set WATTPILOT_KEY "$WATTPILOT_KEY"
           azd env set DOCKER_USERNAME "$DOCKER_USERNAME"
           azd env set DOCKER_PASSWORD "$DOCKER_PASSWORD"
-          if [[ -n "${ENTRA_CLIENT_ID:-}" && -n "${ENTRA_CLIENT_SECRET:-}" ]]; then
-            azd env set ENTRA_CLIENT_ID "$ENTRA_CLIENT_ID"
-            azd env set ENTRA_CLIENT_SECRET "$ENTRA_CLIENT_SECRET"
-          fi
-          azd provision --no-prompt
           azd deploy --no-prompt
