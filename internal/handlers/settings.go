@@ -14,6 +14,9 @@ import (
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/settings"
 )
 
+// maxPriceEntries is the maximum number of price entries accepted from a single form submission.
+const maxPriceEntries = 200
+
 // PriceEntry is a key+price pair for template rendering.
 // Month holds "YYYY-MM" for monthly entries or "YYYY" for year-level fallbacks.
 type PriceEntry struct {
@@ -44,7 +47,7 @@ func sortedPriceEntries(prices map[string]float64) []PriceEntry {
 // and returns the collected price map.
 func parseDynamicPrices(r *http.Request, prefix string) map[string]float64 {
 	prices := make(map[string]float64)
-	for i := 0; i < 200; i++ {
+	for i := 0; i < maxPriceEntries; i++ {
 		month := r.FormValue(fmt.Sprintf("%s_month_%d", prefix, i))
 		priceStr := r.FormValue(fmt.Sprintf("%s_price_%d", prefix, i))
 		if month == "" || priceStr == "" {

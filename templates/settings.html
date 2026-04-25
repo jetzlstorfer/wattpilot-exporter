@@ -210,7 +210,7 @@
                     const inputs = lastRow.querySelectorAll('input');
                     if (inputs[0]) inputs[0].value = data.month;
                     if (inputs[1]) inputs[1].value = data.price.toFixed(5);
-                    status.textContent = '✅ Added ' + data.month + ': ' + (data.price * 100).toFixed(2) + ' ct/kWh (saved)';
+                    status.textContent = '✅ Added ' + data.month + ': ' + (data.price * 100).toFixed(2) + ' ct/kWh — click Save Settings to persist';
                     status.className = 'self-center text-sm text-emerald-400';
                 }
             })
