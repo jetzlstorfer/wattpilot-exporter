@@ -36,3 +36,10 @@ data/*_backup.json
 # bicep generated files
 *.bicep.*
 infra/main.json
+
+# old src/ layout (can be removed after full migration)
+src/
+
+# Azure Developer CLI environment (contains secrets)
+.azure/
+

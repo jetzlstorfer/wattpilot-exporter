@@ -11,11 +11,12 @@ import (
 
 // MonthStat holds aggregated statistics for a single month.
 type MonthStat struct {
-	Month    string
-	Sessions int
-	Energy   float64
-	Price    float64
-	Margin   float64
+	Month           string
+	Sessions        int
+	Energy          float64
+	Price           float64
+	Margin          float64
+	ChargeToCompany float64
 }
 
 // ChartsData is the template context for the charts page.
@@ -63,12 +64,17 @@ func ChartHandler(templateDir string) http.HandlerFunc {
 				totalEuro += wattpilot.CalculatePrice(session.End, session.Energy, 100)
 				totalMargin += wattpilot.CalculatePriceMargin(session.End, session.Energy, session.Eco)
 			}
+			// Subtract monthly network fee from margin
+			if len(monthData.Data) > 0 {
+				totalMargin -= wattpilot.GetNetworkFeeMonthly()
+			}
 			monthStats = append(monthStats, MonthStat{
-				Month:    months[i],
-				Sessions: len(monthData.Data),
-				Energy:   wattpilot.RoundFloat(totalEnergy, 2),
-				Price:    wattpilot.RoundFloat(totalEuro, 2),
-				Margin:   wattpilot.RoundFloat(totalMargin, 2),
+				Month:           months[i],
+				Sessions:        len(monthData.Data),
+				Energy:          wattpilot.RoundFloat(totalEnergy, 2),
+				Price:           wattpilot.RoundFloat(totalEuro, 2),
+				Margin:          wattpilot.RoundFloat(totalMargin, 2),
+				ChargeToCompany: wattpilot.RoundFloat(totalEnergy*wattpilot.GetOfficialPricePerKwhForMonth(months[i]), 2),
 			})
 		}
 

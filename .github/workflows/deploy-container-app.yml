@@ -67,11 +67,15 @@ jobs:
           username: ${{ secrets.WATTPILOT_REGISTRY_USERNAME }}
           password: ${{ secrets.WATTPILOT_REGISTRY_PASSWORD }}
 
-      - name: Deploy via AZD (deploy only)
+      - name: Deploy via AZD (provision + deploy)
         run: |
           azd env new wattpilot-prod --no-prompt
           azd env set AZURE_SUBSCRIPTION_ID ${{ secrets.WATTPILOT_AZURE_SUBSCRIPTION_ID }}
           azd env set AZURE_LOCATION swedencentral
+          azd env set WATTPILOT_KEY ${{ secrets.WATTPILOT_KEY }}
           azd env set DOCKER_USERNAME ${{ secrets.WATTPILOT_REGISTRY_USERNAME }}
           azd env set DOCKER_PASSWORD ${{ secrets.WATTPILOT_REGISTRY_PASSWORD }}
+          azd env set ENTRA_CLIENT_ID ${{ secrets.ENTRA_CLIENT_ID }}
+          azd env set ENTRA_CLIENT_SECRET ${{ secrets.ENTRA_CLIENT_SECRET }}
+          azd provision --no-prompt
           azd deploy --no-prompt
