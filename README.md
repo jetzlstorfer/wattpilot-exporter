@@ -203,6 +203,7 @@ azd provision
 ```
 
 > **Without** `ENTRA_CLIENT_ID` and `ENTRA_CLIENT_SECRET`, the app deploys without authentication (publicly accessible).
+> Entra ID / Easy Auth is configured in the Azure infrastructure. Updating these values requires `azd provision`; `azd deploy` alone only updates the container image and will not apply auth configuration changes.
 
 #### 3. Custom Domain (optional)
 
