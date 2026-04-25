@@ -2,7 +2,6 @@
 
 A lightweight Go web application that fetches EV charging session data from [Fronius Wattpilot](https://www.fronius.com/en/solar-energy/installers-partners/products-solutions/e-mobility/wattpilot) and calculates monthly charging costs based on the official Austrian government electricity rates ([BMF Sachbezug](https://www.bmf.gv.at/themen/steuern/arbeitnehmerveranlagung/pendlerfoerderung-das-pendlerpauschale/sachbezug-kraftfahrzeug.html)).
 
-> **Fork note:** This is a customized fork of [jetzlstorfer/wattpilot-exporter](https://github.com/jetzlstorfer/wattpilot-exporter). See [Changes from Upstream](#changes-from-upstream) for details.
 
 ## Features
 
@@ -22,22 +21,6 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 ![Dashboard Screenshot](./assets/screenshot-dashboard.png)
 ![Settings Screenshot](./assets/screenshot-settings.png)
 
-## Changes from Upstream
-
-This fork adds the following features on top of the [original repo](https://github.com/jetzlstorfer/wattpilot-exporter):
-
-| Feature | Description |
-|---|---|
-| **Settings page** (`/settings`) | In-app UI to configure car model, official rates, purchase prices, and network fee. Settings are persisted in Azure Blob Storage. |
-| **Monthly price entries** | Prices can be set per month (`YYYY-MM`) or per year (`YYYY`) as fallback. |
-| **SteirerStrom Flex fetch** | Button on settings page scrapes the current Arbeitspreis from tarife.at and saves it as a monthly entry. |
-| **Network fee (EVN)** | Configurable monthly flat fee (default €4.20) subtracted from savings/margin calculations. |
-| **Charge to Company** | Prominent display on dashboard, new column in charts table, and explicit row in Excel export showing the amount to invoice your employer. |
-| **Entra ID authentication** | Azure Container Apps Easy Auth with Microsoft identity provider, restricted to a single tenant. |
-| **Custom domain in Bicep** | Custom domain + managed TLS certificate configured as infrastructure-as-code so it persists across `azd provision`. |
-| **Azure Blob Storage** | New infrastructure module for storing app settings with RBAC access via managed identity. |
-| **Docker image** | Changed to `marsche79/wattpilot-export` (update `azure.yaml` to use your own). |
-| **Car model** | Configurable via settings (default: BMW iX3). |
 
 ## Prerequisites
 

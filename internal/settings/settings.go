@@ -39,7 +39,7 @@ var (
 // Defaults returns settings with the original hardcoded values.
 func Defaults() Settings {
 	return Settings{
-		CarModel: "BMW iX3",
+		CarModel: "Volvo EX40",
 		OfficialPrices: map[string]float64{
 			"2024": 0.33182,
 			"2025": 0.35889,

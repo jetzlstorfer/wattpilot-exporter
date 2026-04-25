@@ -39,6 +39,7 @@ param managedCertificateId string = ''
 var abbrs = loadJsonContent('abbreviations.json')
 // Storage accounts don't allow hyphens; strip them from the environment name
 var cleanEnvironmentName = replace(environmentName, '-', '')
+var blobStorageName = 'st${uniqueString(subscription().subscriptionId, environmentName, 'settings')}'
 var tags = { 'azd-env-name': environmentName }
 
 // Resource Group
@@ -77,7 +78,7 @@ module blobStorage 'modules/blob-storage.bicep' = {
   name: 'blob-storage'
   scope: rg
   params: {
-    name: 'st${resourceToken}'
+    name: blobStorageName
     location: location
     tags: tags
   }

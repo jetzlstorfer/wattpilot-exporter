@@ -134,7 +134,7 @@ resource authConfig 'Microsoft.App/containerApps/authConfigs@2024-03-01' = if (h
         registration: {
           clientId: entraClientId
           clientSecretSettingName: 'microsoft-provider-authentication-secret'
-          openIdIssuer: 'https://login.microsoftonline.com/${subscription().tenantId}/v2.0'
+          openIdIssuer: '${environment().authentication.loginEndpoint}${subscription().tenantId}/v2.0'
         }
         login: {
           loginParameters: ['scope=openid profile email']

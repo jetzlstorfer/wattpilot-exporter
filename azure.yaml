@@ -13,6 +13,6 @@ services:
       path: Dockerfile
       context: .
       registry: docker.io
-      image: marsche79/wattpilot-export
+      image: jetzlstorfer/wattpilot-export
       # Tag format: <env-name>-<timestamp>
       # azd auto-generates a timestamp-based tag for each deployment
