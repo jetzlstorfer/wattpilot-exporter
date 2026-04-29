@@ -13,7 +13,7 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 - **SteirerStrom Flex price fetch** — one-click fetch of the current electricity price from [tarife.at](https://www.tarife.at/energie/anbieter/energie-steiermark/steirerstrom-flex-391)
 - **Entra ID authentication** — Azure Easy Auth restricts access to your Azure AD tenant
 - **Custom domain support** — CNAME + managed TLS certificate configured in Bicep
-- **Live charging indicator** — detects whether a charging session is currently active
+- **Live charging indicator** — dashboard status banner on the current month view that appears when charging seems active based on recent session updates
 - **Data caching and backup fallback** — data is cached in local filesystem storage or Azure Blob Storage; monthly backups are stored as `data/*_backup.json`; use the `/refresh` endpoint to re-fetch
 - **OpenTelemetry observability** — automatic HTTP request traces, app-level spans, and structured logs
 - **Docker support** — multi-stage Docker build for minimal container images

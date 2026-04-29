@@ -31,6 +31,7 @@ type DashboardData struct {
 	FormattedDate    string
 	PrevMonth        string
 	NextMonth        string
+	IsCurrentMonth   bool
 	ChargingSessions int
 	LatestSession    string
 	IsCharging       bool
@@ -39,6 +40,31 @@ type DashboardData struct {
 	TotalMargin      float64
 	Sessions         []SessionPoint
 	Error            string
+}
+
+const liveChargingWindow = 10 * time.Minute
+
+func isActiveCharging(monthToCalculate string, latestSessionEnd time.Time, now time.Time, loc *time.Location) bool {
+	if latestSessionEnd.IsZero() || loc == nil {
+		return false
+	}
+
+	if monthToCalculate != now.In(loc).Format("2006-01") {
+		return false
+	}
+	age := now.In(loc).Sub(latestSessionEnd.In(loc))
+	return age >= -2*time.Minute && age <= liveChargingWindow
+}
+
+func sessionEndTime(entry wattpilot.WattpilotEntry, loc *time.Location) time.Time {
+	if entry.EndUnix > 0 {
+		return time.UnixMilli(entry.EndUnix).In(loc)
+	}
+	end, err := time.ParseInLocation("02.01.2006 15:04:05", entry.End, loc)
+	if err != nil {
+		return time.Time{}
+	}
+	return end
 }
 
 func calculateData(ctx context.Context, date string) (DashboardData, error) {
@@ -88,6 +114,8 @@ func calculateData(ctx context.Context, date string) (DashboardData, error) {
 	totalPrice := 0.0
 	totalMargin := 0.0
 	latestSession := ""
+	latestSessionEnd := time.Time{}
+	loc, _ := time.LoadLocation("Europe/Berlin")
 
 	var sessions []SessionPoint
 
@@ -97,22 +125,22 @@ func calculateData(ctx context.Context, date string) (DashboardData, error) {
 		price := wattpilot.CalculatePrice(data.End, data.Energy, 100)
 		totalPrice += price
 		totalMargin += wattpilot.CalculatePriceMargin(data.End, data.Energy, data.Eco)
-		latestSession = data.End
 		sessions = append(sessions, SessionPoint{
 			EndTime: data.End,
 			Energy:  wattpilot.RoundFloat(data.Energy, 2),
 			Price:   wattpilot.RoundFloat(price, 2),
 		})
-	}
-	activeSession := false
-	loc, _ := time.LoadLocation("Europe/Berlin")
-	latestSessionTimeStamp, _ := time.Parse(time.DateTime, latestSession)
-	latestSessionTimeStamp = latestSessionTimeStamp.Add(-2 * time.Hour) // fix for timezone
 
-	if latestSessionTimeStamp.Add(1 * time.Minute).After(time.Now().In(loc)) {
-		// session is active
-		activeSession = true
+		entryEnd := sessionEndTime(data, loc)
+		if !entryEnd.IsZero() && (latestSessionEnd.IsZero() || entryEnd.After(latestSessionEnd)) {
+			latestSessionEnd = entryEnd
+			latestSession = data.End
+		}
 	}
+
+	now := time.Now().In(loc)
+	isCurrentMonth := monthToCalculate == now.Format("2006-01")
+	activeSession := isActiveCharging(monthToCalculate, latestSessionEnd, now, loc)
 
 	// Subtract monthly network fee from margin (spread across consumption)
 	if len(parsedData.Data) > 0 {
@@ -124,6 +152,7 @@ func calculateData(ctx context.Context, date string) (DashboardData, error) {
 		FormattedDate:    formattedDate,
 		PrevMonth:        wattpilot.GetPrevMonth(monthToCalculate),
 		NextMonth:        wattpilot.GetNextMonth(monthToCalculate),
+		IsCurrentMonth:   isCurrentMonth,
 		ChargingSessions: len(parsedData.Data),
 		LatestSession:    latestSession,
 		IsCharging:       activeSession,

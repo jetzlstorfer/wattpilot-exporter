@@ -26,6 +26,7 @@ run:
 		kill $$pid; \
 		sleep 1; \
 	fi
+	@(sleep 2; [ -n "$$BROWSER" ] && "$$BROWSER" http://localhost:8080 >/dev/null 2>&1 || true) &
 	$(GO) run $(RUN_FLAGS) ./cmd/server
 
 run-cached: # don't delete data/data.json before running
@@ -35,6 +36,7 @@ run-cached: # don't delete data/data.json before running
 		kill $$pid; \
 		sleep 1; \
 	fi
+	@(sleep 2; [ -n "$$BROWSER" ] && "$$BROWSER" http://localhost:8080 >/dev/null 2>&1 || true) &
 	$(GO) run $(RUN_FLAGS) ./cmd/server
 
 # Clean the build artifacts

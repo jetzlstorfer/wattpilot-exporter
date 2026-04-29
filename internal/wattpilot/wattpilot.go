@@ -69,6 +69,8 @@ type WattpilotEntry struct {
 	Nexttrip          int     `json:"nexttrip"`
 	Start             string  `json:"start"`
 	End               string  `json:"end"`
+	StartUnix         int64   `json:"startUnix"`
+	EndUnix           int64   `json:"endUnix"`
 	SecondsTotal      string  `json:"seconds_total"`
 	SecondsCharged    string  `json:"seconds_charged"`
 	MaxPower          float64 `json:"max_power"`
