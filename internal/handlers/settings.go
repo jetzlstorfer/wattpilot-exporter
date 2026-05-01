@@ -26,12 +26,14 @@ type PriceEntry struct {
 
 // SettingsData is the template context for the settings page.
 type SettingsData struct {
-	CarModel          string
-	OfficialPrices    []PriceEntry
-	PurchasePrices    []PriceEntry
-	NetworkFeeMonthly float64
-	Success           bool
-	Error             string
+	CarModel                  string
+	OfficialPrices            []PriceEntry
+	PurchasePrices            []PriceEntry
+	NetworkFeeMonthly         float64
+	LiveChargingWindowMinutes int
+	DataTTLMinutes            int
+	Success                   bool
+	Error                     string
 }
 
 func sortedPriceEntries(prices map[string]float64) []PriceEntry {
@@ -93,14 +95,30 @@ func SettingsHandler(templateDir string) http.HandlerFunc {
 				}
 			}
 
+			// Update live charging window
+			if lcw := r.FormValue("liveChargingWindowMinutes"); lcw != "" {
+				if minutes, err := strconv.Atoi(lcw); err == nil && minutes > 0 {
+					s.LiveChargingWindowMinutes = minutes
+				}
+			}
+
+			// Update data TTL
+			if dt := r.FormValue("dataTTLMinutes"); dt != "" {
+				if minutes, err := strconv.Atoi(dt); err == nil && minutes > 0 {
+					s.DataTTLMinutes = minutes
+				}
+			}
+
 			if err := settings.Save(ctx, s); err != nil {
 				slog.ErrorContext(ctx, "settingsHandler: failed to save settings", "error", err)
 				renderSettings(w, templateDir, SettingsData{
-					CarModel:          s.CarModel,
-					OfficialPrices:    sortedPriceEntries(s.OfficialPrices),
-					PurchasePrices:    sortedPriceEntries(s.PurchasePrices),
-					NetworkFeeMonthly: s.NetworkFeeMonthly,
-					Error:             "Failed to save settings: " + err.Error(),
+					CarModel:                  s.CarModel,
+					OfficialPrices:            sortedPriceEntries(s.OfficialPrices),
+					PurchasePrices:            sortedPriceEntries(s.PurchasePrices),
+					NetworkFeeMonthly:         s.NetworkFeeMonthly,
+					LiveChargingWindowMinutes: s.LiveChargingWindowMinutes,
+					DataTTLMinutes:            s.DataTTLMinutes,
+					Error:                     "Failed to save settings: " + err.Error(),
 				})
 				return
 			}
@@ -108,11 +126,13 @@ func SettingsHandler(templateDir string) http.HandlerFunc {
 			// Reload settings and show success
 			current := settings.Get()
 			renderSettings(w, templateDir, SettingsData{
-				CarModel:          current.CarModel,
-				OfficialPrices:    sortedPriceEntries(current.OfficialPrices),
-				PurchasePrices:    sortedPriceEntries(current.PurchasePrices),
-				NetworkFeeMonthly: current.NetworkFeeMonthly,
-				Success:        true,
+				CarModel:                  current.CarModel,
+				OfficialPrices:            sortedPriceEntries(current.OfficialPrices),
+				PurchasePrices:            sortedPriceEntries(current.PurchasePrices),
+				NetworkFeeMonthly:         current.NetworkFeeMonthly,
+				LiveChargingWindowMinutes: current.LiveChargingWindowMinutes,
+				DataTTLMinutes:            current.DataTTLMinutes,
+				Success:                   true,
 			})
 			return
 		}
@@ -120,10 +140,12 @@ func SettingsHandler(templateDir string) http.HandlerFunc {
 		// GET: show current settings
 		current := settings.Get()
 		renderSettings(w, templateDir, SettingsData{
-			CarModel:          current.CarModel,
-			OfficialPrices:    sortedPriceEntries(current.OfficialPrices),
-			PurchasePrices:    sortedPriceEntries(current.PurchasePrices),
-			NetworkFeeMonthly: current.NetworkFeeMonthly,
+			CarModel:                  current.CarModel,
+			OfficialPrices:            sortedPriceEntries(current.OfficialPrices),
+			PurchasePrices:            sortedPriceEntries(current.PurchasePrices),
+			NetworkFeeMonthly:         current.NetworkFeeMonthly,
+			LiveChargingWindowMinutes: current.LiveChargingWindowMinutes,
+			DataTTLMinutes:            current.DataTTLMinutes,
 		})
 	}
 }

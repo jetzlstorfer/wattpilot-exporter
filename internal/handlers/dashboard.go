@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 
+	"github.com/jetzlstorfer/wattpilot-exporter/internal/settings"
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/wattpilot"
 )
 
@@ -42,8 +43,6 @@ type DashboardData struct {
 	Error            string
 }
 
-const liveChargingWindow = 10 * time.Minute
-
 func isActiveCharging(monthToCalculate string, latestSessionEnd time.Time, now time.Time, loc *time.Location) bool {
 	if latestSessionEnd.IsZero() || loc == nil {
 		return false
@@ -52,8 +51,9 @@ func isActiveCharging(monthToCalculate string, latestSessionEnd time.Time, now t
 	if monthToCalculate != now.In(loc).Format("2006-01") {
 		return false
 	}
+	window := time.Duration(settings.GetLiveChargingWindowMinutes()) * time.Minute
 	age := now.In(loc).Sub(latestSessionEnd.In(loc))
-	return age >= -2*time.Minute && age <= liveChargingWindow
+	return age >= -2*time.Minute && age <= window
 }
 
 func sessionEndTime(entry wattpilot.WattpilotEntry, loc *time.Location) time.Time {
