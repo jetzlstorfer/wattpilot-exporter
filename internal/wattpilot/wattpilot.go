@@ -153,7 +153,7 @@ func FetchJSON(ctx context.Context, fetchURL string) ([]byte, error) {
 	return jsonData, nil
 }
 
-// isDataStale checks if the data/data.json file/blob is older than DataTTLMinutes
+// isDataStale checks if the data/data.json file/blob is older than the configured DataTTLMinutes
 func isDataStale(ctx context.Context) bool {
 	modTime, err := globalStore.ModTime(ctx, JSONFileName)
 	if err != nil {
@@ -162,7 +162,7 @@ func isDataStale(ctx context.Context) bool {
 	}
 
 	fileAge := time.Since(modTime)
-	ttl := time.Duration(DataTTLMinutes) * time.Minute
+	ttl := time.Duration(settings.GetDataTTLMinutes()) * time.Minute
 
 	return fileAge > ttl
 }

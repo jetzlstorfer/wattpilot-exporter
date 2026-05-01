@@ -135,8 +135,28 @@
                 <p class="text-sm text-gray-500 mb-6">Monthly flat fee for grid infrastructure — subtracted from savings/margin</p>
                 <div class="max-w-md">
                     <label for="networkFee" class="block text-sm font-medium text-gray-400 mb-2">Monthly fee (€)</label>
-                    <input type="number" step="0.01" id="networkFee" name="networkFee" value="{{ printf "%.2f" .NetworkFeeMonthly }}"
+                    <input type="number" step="0.01" min="0" id="networkFee" name="networkFee" value="{{ printf "%.2f" .NetworkFeeMonthly }}"
                         class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                </div>
+            </div>
+
+            <!-- Timing Settings -->
+            <div class="card rounded-2xl p-6 mb-6">
+                <h2 class="text-lg font-bold text-white mb-1">Timing</h2>
+                <p class="text-sm text-gray-500 mb-6">Control how the dashboard detects active charging sessions and how often data is considered stale</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
+                    <div>
+                        <label for="liveChargingWindowMinutes" class="block text-sm font-medium text-gray-400 mb-2">Live charging window (minutes)</label>
+                        <input type="number" step="1" min="1" id="liveChargingWindowMinutes" name="liveChargingWindowMinutes" value="{{ .LiveChargingWindowMinutes }}"
+                            class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                        <p class="text-xs text-gray-600 mt-2">Sessions ending within this many minutes are shown as currently charging (default: 5)</p>
+                    </div>
+                    <div>
+                        <label for="dataTTLMinutes" class="block text-sm font-medium text-gray-400 mb-2">Data refresh interval (minutes)</label>
+                        <input type="number" step="1" min="1" id="dataTTLMinutes" name="dataTTLMinutes" value="{{ .DataTTLMinutes }}"
+                            class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                        <p class="text-xs text-gray-600 mt-2">Cached data older than this is automatically re-fetched from the API (default: 30)</p>
+                    </div>
                 </div>
             </div>
 

@@ -25,10 +25,12 @@ const (
 
 // Settings holds all user-configurable application settings.
 type Settings struct {
-	CarModel          string             `json:"carModel"`
-	OfficialPrices    map[string]float64 `json:"officialPrices"`
-	PurchasePrices    map[string]float64 `json:"purchasePrices"`
-	NetworkFeeMonthly float64            `json:"networkFeeMonthly"`
+	CarModel                  string             `json:"carModel"`
+	OfficialPrices            map[string]float64 `json:"officialPrices"`
+	PurchasePrices            map[string]float64 `json:"purchasePrices"`
+	NetworkFeeMonthly         float64            `json:"networkFeeMonthly"`
+	LiveChargingWindowMinutes int                `json:"liveChargingWindowMinutes"`
+	DataTTLMinutes            int                `json:"dataTTLMinutes"`
 }
 
 var (
@@ -50,7 +52,9 @@ func Defaults() Settings {
 			"2025": 0.25,
 			"2026": 0.25,
 		},
-		NetworkFeeMonthly: 4.20,
+		NetworkFeeMonthly:         4.20,
+		LiveChargingWindowMinutes: 5,
+		DataTTLMinutes:            30,
 	}
 }
 
@@ -135,6 +139,21 @@ func Load(ctx context.Context) {
 	}
 	if s.PurchasePrices == nil {
 		s.PurchasePrices = d.PurchasePrices
+	}
+	// For NetworkFeeMonthly: only apply default when the key is absent in JSON
+	// (distinguishes "not configured yet" from "explicitly set to 0").
+	var rawMap map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawMap); err == nil {
+		if _, ok := rawMap["networkFeeMonthly"]; !ok {
+			s.NetworkFeeMonthly = d.NetworkFeeMonthly
+		}
+	}
+	// For int settings: 0 is always invalid, so use default when unset.
+	if s.LiveChargingWindowMinutes <= 0 {
+		s.LiveChargingWindowMinutes = d.LiveChargingWindowMinutes
+	}
+	if s.DataTTLMinutes <= 0 {
+		s.DataTTLMinutes = d.DataTTLMinutes
 	}
 
 	mu.Lock()
@@ -255,12 +274,29 @@ func GetCarModel() string {
 }
 
 // GetNetworkFeeMonthly returns the monthly network infrastructure fee in €.
+// Returns zero when the user has explicitly configured a zero fee.
 func GetNetworkFeeMonthly() float64 {
+	return Get().NetworkFeeMonthly
+}
+
+// GetLiveChargingWindowMinutes returns the number of minutes within which a
+// session is considered "currently charging".
+func GetLiveChargingWindowMinutes() int {
 	s := Get()
-	if s.NetworkFeeMonthly > 0 {
-		return s.NetworkFeeMonthly
+	if s.LiveChargingWindowMinutes <= 0 {
+		return Defaults().LiveChargingWindowMinutes
 	}
-	return Defaults().NetworkFeeMonthly
+	return s.LiveChargingWindowMinutes
+}
+
+// GetDataTTLMinutes returns the number of minutes after which cached data is
+// considered stale and an auto-refresh should be attempted.
+func GetDataTTLMinutes() int {
+	s := Get()
+	if s.DataTTLMinutes <= 0 {
+		return Defaults().DataTTLMinutes
+	}
+	return s.DataTTLMinutes
 }
 
 // ToJSON returns the settings as a formatted JSON reader (for blob upload).
