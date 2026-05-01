@@ -95,11 +95,11 @@
                 <p class="text-sm text-gray-500 mb-6">Austrian government-mandated rate per kWh — used to calculate what you charge your company. Use YYYY-MM for monthly rates or YYYY for year-level fallbacks.</p>
                 <div id="official_entries">
                     {{ range $i, $e := .OfficialPrices }}
-                    <div class="flex items-center gap-4 mb-3">
+                    <div class="flex flex-wrap items-center gap-3 mb-3">
                         <input type="text" name="official_month_{{ $i }}" value="{{ $e.Month }}" placeholder="YYYY-MM or YYYY"
-                            class="w-40 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
+                            class="w-full sm:w-40 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
                         <input type="number" step="0.00001" name="official_price_{{ $i }}" value="{{ printf "%.5f" $e.Price }}" placeholder="€/kWh"
-                            class="w-44 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
+                            class="w-full sm:w-44 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
                         <button type="button" onclick="this.parentElement.remove(); reindex('official')" class="text-red-400 hover:text-red-300 text-xl font-bold px-2">&times;</button>
                     </div>
                     {{ end }}
@@ -113,11 +113,11 @@
                 <p class="text-sm text-gray-500 mb-6">What you actually pay per kWh for electricity — used to calculate savings/margin. Use YYYY-MM for monthly rates or YYYY for year-level fallbacks.</p>
                 <div id="purchase_entries">
                     {{ range $i, $e := .PurchasePrices }}
-                    <div class="flex items-center gap-4 mb-3">
+                    <div class="flex flex-wrap items-center gap-3 mb-3">
                         <input type="text" name="purchase_month_{{ $i }}" value="{{ $e.Month }}" placeholder="YYYY-MM or YYYY"
-                            class="w-40 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
+                            class="w-full sm:w-40 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
                         <input type="number" step="0.00001" name="purchase_price_{{ $i }}" value="{{ printf "%.5f" $e.Price }}" placeholder="€/kWh"
-                            class="w-44 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
+                            class="w-full sm:w-44 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
                         <button type="button" onclick="this.parentElement.remove(); reindex('purchase')" class="text-red-400 hover:text-red-300 text-xl font-bold px-2">&times;</button>
                     </div>
                     {{ end }}
@@ -186,12 +186,12 @@
         const container = document.getElementById(section + '_entries');
         const idx = container.children.length;
         const row = document.createElement('div');
-        row.className = 'flex items-center gap-4 mb-3';
+        row.className = 'flex flex-wrap items-center gap-3 mb-3';
         row.innerHTML = `
             <input type="text" name="${section}_month_${idx}" placeholder="YYYY-MM or YYYY"
-                class="w-40 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
+                class="w-full sm:w-40 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
             <input type="number" step="0.00001" name="${section}_price_${idx}" placeholder="€/kWh"
-                class="w-44 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
+                class="w-full sm:w-44 px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
             <button type="button" onclick="this.parentElement.remove(); reindex('${section}')" class="text-red-400 hover:text-red-300 text-xl font-bold px-2">&times;</button>
         `;
         container.appendChild(row);
