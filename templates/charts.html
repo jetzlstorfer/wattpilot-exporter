@@ -266,24 +266,50 @@
             return value;
         }
 
+        // Remember each indicator's original colour class so we can restore it
+        // when its column is no longer the active sort.
+        headers.forEach(function(h) {
+            const indicator = h.querySelector('.sort-indicator');
+            if (!indicator) return;
+            const original = Array.prototype.find.call(
+                indicator.classList,
+                function(c) { return c.indexOf('text-') === 0; }
+            );
+            if (original) indicator.dataset.originalColor = original;
+        });
+
         function updateIndicators(activeIndex, asc) {
             headers.forEach(function(h) {
                 const indicator = h.querySelector('.sort-indicator');
                 if (!indicator) return;
                 const idx = parseInt(h.getAttribute('data-sort-index'), 10);
+                const original = indicator.dataset.originalColor;
+                if (original) indicator.classList.remove(original);
+                indicator.classList.remove('text-blue-400');
                 if (idx === activeIndex) {
                     indicator.textContent = asc ? '▲' : '▼';
-                    indicator.classList.remove('text-gray-600', 'text-amber-600/70');
                     indicator.classList.add('text-blue-400');
                     h.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
                 } else {
                     indicator.textContent = '↕';
-                    indicator.classList.remove('text-blue-400');
-                    indicator.classList.add('text-gray-600');
+                    if (original) indicator.classList.add(original);
                     h.removeAttribute('aria-sort');
                 }
             });
+            if (liveRegion) {
+                const activeHeader = table.querySelector('th[data-sort-index="' + activeIndex + '"]');
+                const label = activeHeader ? activeHeader.textContent.replace(/[↕▲▼]/g, '').trim() : '';
+                liveRegion.textContent = 'Table sorted by ' + label + ' ' + (asc ? 'ascending' : 'descending');
+            }
         }
+
+        // ARIA live region so screen-reader users hear sort changes.
+        const liveRegion = document.createElement('div');
+        liveRegion.setAttribute('aria-live', 'polite');
+        liveRegion.setAttribute('aria-atomic', 'true');
+        liveRegion.className = 'sr-only';
+        liveRegion.style.cssText = 'position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;';
+        table.parentNode.insertBefore(liveRegion, table);
 
         function sortBy(index, type) {
             const asc = (currentSort.index === index) ? !currentSort.asc : true;
