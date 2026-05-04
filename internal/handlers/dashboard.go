@@ -6,7 +6,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -72,6 +74,11 @@ func calculateData(ctx context.Context, date string) (DashboardData, error) {
 	defer span.End()
 
 	monthToCalculate := time.Now().Format("2006-01")
+	if date == "" {
+		if defaultMonth := strings.TrimSpace(os.Getenv("WATTPILOT_DEFAULT_MONTH")); defaultMonth != "" {
+			monthToCalculate = defaultMonth
+		}
+	}
 	if date != "" {
 		monthToCalculate = date
 	}

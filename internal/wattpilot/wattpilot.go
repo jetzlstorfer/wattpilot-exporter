@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,7 +36,7 @@ const OfficialPricePerKwh2026 = 0.32806
 const PurchasePricePerKwh2024 = 0.2824
 const PurchasePricePerKwh2025 = 0.25
 const PurchasePricePerKwh2026 = 0.25
-const JSONFileName = "data/data.json"
+const JSONFileName = "data.json"
 const WattpilotDataUrl = "https://data.wattpilot.io/api/v1/direct_json?e=TBD&from=TBD&to=TBD&timezone=Europe%2FVienna"
 const DataTTLMinutes = 60     // Auto-refresh data if older than this many minutes
 const FetchTimeoutSeconds = 5 // Timeout for outbound API requests
@@ -44,6 +45,17 @@ const FetchTimeoutSeconds = 5 // Timeout for outbound API requests
 // requests to the Wattpilot API never hang indefinitely.
 var httpClient = &http.Client{
 	Timeout: FetchTimeoutSeconds * time.Second,
+}
+
+func dataRootDir() string {
+	if root := strings.TrimSpace(os.Getenv("WATTPILOT_DATA_DIR")); root != "" {
+		return root
+	}
+	return "data"
+}
+
+func dataFilePath(name string) string {
+	return filepath.Join(dataRootDir(), name)
 }
 
 type WattpilotColumn struct {
@@ -155,7 +167,7 @@ func FetchJSON(ctx context.Context, fetchURL string) ([]byte, error) {
 
 // isDataStale checks if the data/data.json file/blob is older than the configured DataTTLMinutes
 func isDataStale(ctx context.Context) bool {
-	modTime, err := globalStore.ModTime(ctx, JSONFileName)
+	modTime, err := globalStore.ModTime(ctx, dataFilePath(JSONFileName))
 	if err != nil {
 		// File/blob doesn't exist or can't be accessed - consider it stale
 		return true
@@ -196,7 +208,7 @@ func GetJSONData(ctx context.Context) ([]byte, error) {
 	tryAutoRefresh(ctx)
 
 	// Read JSON document from storage (whether it's fresh or stale)
-	jsonData, err := globalStore.Read(ctx, JSONFileName)
+	jsonData, err := globalStore.Read(ctx, dataFilePath(JSONFileName))
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to read JSON data", "error", err)
 		// Don't auto-fetch here anymore - let the caller decide whether to use backup or fetch
@@ -215,7 +227,7 @@ func saveJSONFile(ctx context.Context, filename string, jsonData []byte) error {
 }
 
 func getMonthlyBackupFilename(yearMonth string) string {
-	return fmt.Sprintf("data/data-%s_backup.json", yearMonth)
+	return dataFilePath(fmt.Sprintf("data-%s_backup.json", yearMonth))
 }
 
 // createMonthlyBackups extracts data for each month and saves it to a backup file
@@ -500,7 +512,7 @@ func RefreshData(ctx context.Context) error {
 	}
 
 	// Save JSON document to main file
-	err = saveJSONFile(ctx, JSONFileName, jsonData)
+	err = saveJSONFile(ctx, dataFilePath(JSONFileName), jsonData)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())

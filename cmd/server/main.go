@@ -26,9 +26,13 @@ func main() {
 	// get env variables from .env file
 	// Using Overload() instead of Load() to ensure .env always takes precedence
 	// over any pre-existing environment variables (e.g. empty WATTPILOT_KEY in shell)
-	if err := godotenv.Overload(); err != nil {
-		// Not fatal — the variable may already be in the environment
-		log.Println("Note: .env file not loaded:", err)
+	if os.Getenv("WATTPILOT_SKIP_DOTENV") != "1" {
+		if err := godotenv.Overload(); err != nil {
+			// Not fatal — the variable may already be in the environment
+			log.Println("Note: .env file not loaded:", err)
+		}
+	} else {
+		log.Println("Note: skipping .env loading because WATTPILOT_SKIP_DOTENV=1")
 	}
 
 	// Initialise OpenTelemetry (traces + logs).
