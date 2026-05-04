@@ -82,29 +82,29 @@
         <div class="card rounded-2xl p-6">
             <h2 class="text-lg font-bold text-white mb-6">Monthly Breakdown</h2>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table id="monthlyBreakdownTable" class="w-full text-sm sortable-table">
                     <thead>
                         <tr class="border-b border-white/10">
-                            <th class="text-left text-gray-500 font-medium pb-3 pr-6">Month</th>
-                            <th class="text-right text-gray-500 font-medium pb-3 pr-6">Sessions</th>
-                            <th class="text-right text-gray-500 font-medium pb-3 pr-6">Energy (kWh)</th>
-                            <th class="text-right text-gray-500 font-medium pb-3 pr-6">Cost (€)</th>
-                            <th class="text-right text-amber-500/80 font-medium pb-3 pr-6">Charge to Company (€)</th>
-                            <th class="text-right text-gray-500 font-medium pb-3 pr-6">Margin (€)</th>
-                            <th class="text-right text-gray-500 font-medium pb-3">Download</th>
+                            <th class="text-left text-gray-500 font-medium pb-3 pr-6 cursor-pointer select-none hover:text-gray-300 transition-colors" data-sort-type="text" data-sort-index="0" scope="col"><span class="inline-flex items-center gap-1">Month<span class="sort-indicator text-gray-600">↕</span></span></th>
+                            <th class="text-right text-gray-500 font-medium pb-3 pr-6 cursor-pointer select-none hover:text-gray-300 transition-colors" data-sort-type="number" data-sort-index="1" scope="col"><span class="inline-flex items-center gap-1">Sessions<span class="sort-indicator text-gray-600">↕</span></span></th>
+                            <th class="text-right text-gray-500 font-medium pb-3 pr-6 cursor-pointer select-none hover:text-gray-300 transition-colors" data-sort-type="number" data-sort-index="2" scope="col"><span class="inline-flex items-center gap-1">Energy (kWh)<span class="sort-indicator text-gray-600">↕</span></span></th>
+                            <th class="text-right text-gray-500 font-medium pb-3 pr-6 cursor-pointer select-none hover:text-gray-300 transition-colors" data-sort-type="number" data-sort-index="3" scope="col"><span class="inline-flex items-center gap-1">Cost (€)<span class="sort-indicator text-gray-600">↕</span></span></th>
+                            <th class="text-right text-amber-500/80 font-medium pb-3 pr-6 cursor-pointer select-none hover:text-amber-300 transition-colors" data-sort-type="number" data-sort-index="4" scope="col"><span class="inline-flex items-center gap-1">Charge to Company (€)<span class="sort-indicator text-amber-600/70">↕</span></span></th>
+                            <th class="text-right text-gray-500 font-medium pb-3 pr-6 cursor-pointer select-none hover:text-gray-300 transition-colors" data-sort-type="number" data-sort-index="5" scope="col"><span class="inline-flex items-center gap-1">Margin (€)<span class="sort-indicator text-gray-600">↕</span></span></th>
+                            <th class="text-right text-gray-500 font-medium pb-3" scope="col">Download</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-white/5">
                         {{ range .Months }}
                         <tr class="hover:bg-white/5 transition-colors">
-                            <td class="py-3 pr-6">
+                            <td class="py-3 pr-6" data-sort-value="{{ .Month }}">
                                 <a href="/?date={{ .Month }}" class="text-blue-400 hover:text-blue-300 font-medium transition-colors">{{ .Month }}</a>
                             </td>
-                            <td class="py-3 pr-6 text-right text-gray-400">{{ .Sessions }}</td>
-                            <td class="py-3 pr-6 text-right text-gray-300 font-medium">{{ printf "%.2f" .Energy }}</td>
-                            <td class="py-3 pr-6 text-right text-gray-300">{{ printf "%.2f" .Price }}</td>
-                            <td class="py-3 pr-6 text-right text-amber-400 font-semibold">{{ printf "%.2f" .ChargeToCompany }}</td>
-                            <td class="py-3 pr-6 text-right text-emerald-400 font-medium">{{ printf "%.2f" .Margin }}</td>
+                            <td class="py-3 pr-6 text-right text-gray-400" data-sort-value="{{ .Sessions }}">{{ .Sessions }}</td>
+                            <td class="py-3 pr-6 text-right text-gray-300 font-medium" data-sort-value="{{ .Energy }}">{{ printf "%.2f" .Energy }}</td>
+                            <td class="py-3 pr-6 text-right text-gray-300" data-sort-value="{{ .Price }}">{{ printf "%.2f" .Price }}</td>
+                            <td class="py-3 pr-6 text-right text-amber-400 font-semibold" data-sort-value="{{ .ChargeToCompany }}">{{ printf "%.2f" .ChargeToCompany }}</td>
+                            <td class="py-3 pr-6 text-right text-emerald-400 font-medium" data-sort-value="{{ .Margin }}">{{ printf "%.2f" .Margin }}</td>
                             <td class="py-3 text-right">
                                 <a href="/download?date={{ .Month }}" class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white transition-colors" title="Download Excel report for {{ .Month }}">⬇ Excel</a>
                             </td>
@@ -241,6 +241,83 @@
                 navLinks.classList.remove('open');
                 hamburger.setAttribute('aria-expanded', 'false');
             }
+        });
+    })();
+    </script>
+
+    <script>
+    (function() {
+        const table = document.getElementById('monthlyBreakdownTable');
+        if (!table) return;
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+        const headers = table.querySelectorAll('th[data-sort-index]');
+        let currentSort = { index: -1, asc: true };
+
+        function getCellValue(row, index, type) {
+            const cell = row.children[index];
+            if (!cell) return type === 'number' ? 0 : '';
+            const raw = cell.getAttribute('data-sort-value');
+            const value = raw !== null ? raw : cell.textContent.trim();
+            if (type === 'number') {
+                const n = parseFloat(value);
+                return isNaN(n) ? 0 : n;
+            }
+            return value;
+        }
+
+        function updateIndicators(activeIndex, asc) {
+            headers.forEach(function(h) {
+                const indicator = h.querySelector('.sort-indicator');
+                if (!indicator) return;
+                const idx = parseInt(h.getAttribute('data-sort-index'), 10);
+                if (idx === activeIndex) {
+                    indicator.textContent = asc ? '▲' : '▼';
+                    indicator.classList.remove('text-gray-600', 'text-amber-600/70');
+                    indicator.classList.add('text-blue-400');
+                    h.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
+                } else {
+                    indicator.textContent = '↕';
+                    indicator.classList.remove('text-blue-400');
+                    indicator.classList.add('text-gray-600');
+                    h.removeAttribute('aria-sort');
+                }
+            });
+        }
+
+        function sortBy(index, type) {
+            const asc = (currentSort.index === index) ? !currentSort.asc : true;
+            currentSort = { index: index, asc: asc };
+            const rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+            rows.sort(function(a, b) {
+                const av = getCellValue(a, index, type);
+                const bv = getCellValue(b, index, type);
+                if (type === 'number') {
+                    return asc ? av - bv : bv - av;
+                }
+                return asc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+            });
+            const frag = document.createDocumentFragment();
+            rows.forEach(function(r) { frag.appendChild(r); });
+            tbody.appendChild(frag);
+            updateIndicators(index, asc);
+        }
+
+        headers.forEach(function(h) {
+            h.setAttribute('role', 'button');
+            h.setAttribute('tabindex', '0');
+            const handler = function() {
+                const index = parseInt(h.getAttribute('data-sort-index'), 10);
+                const type = h.getAttribute('data-sort-type') || 'text';
+                sortBy(index, type);
+            };
+            h.addEventListener('click', handler);
+            h.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handler();
+                }
+            });
         });
     })();
     </script>
