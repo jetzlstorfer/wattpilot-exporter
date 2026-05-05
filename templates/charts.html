@@ -254,6 +254,7 @@
 
                 headers.forEach(function(h) {
                     const icon = h.querySelector('.sort-icon');
+                    if (!icon) return;
                     h.classList.remove('text-white');
                     h.classList.add('text-gray-500');
                     icon.textContent = '⇅';
@@ -262,8 +263,10 @@
                 const activeIcon = th.querySelector('.sort-icon');
                 th.classList.remove('text-gray-500');
                 th.classList.add('text-white');
-                activeIcon.textContent = sortAsc ? '↑' : '↓';
-                activeIcon.classList.remove('opacity-50');
+                if (activeIcon) {
+                    activeIcon.textContent = sortAsc ? '↑' : '↓';
+                    activeIcon.classList.remove('opacity-50');
+                }
 
                 const rows = Array.from(tbody.querySelectorAll('tr'));
                 rows.sort(function(a, b) {
@@ -280,6 +283,8 @@
     </script>
 
     <script>
+    (function() {
+        const hamburger = document.getElementById('hamburger');
         const navLinks = document.getElementById('navLinks');
         if (!hamburger || !navLinks) return;
         hamburger.addEventListener('click', function(e) {
