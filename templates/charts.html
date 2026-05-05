@@ -80,17 +80,18 @@
 
         <!-- Summary table -->
         <div class="card rounded-2xl p-6">
-            <h2 class="text-lg font-bold text-white mb-6">Monthly Breakdown</h2>
+            <h2 class="text-lg font-bold text-white mb-1">Monthly Breakdown</h2>
+            <p class="text-sm text-gray-500 mb-6">Click a column header to sort</p>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table id="monthlyBreakdownTable" class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-white/10">
-                            <th class="text-left text-gray-500 font-medium pb-3 pr-6">Month</th>
-                            <th class="text-right text-gray-500 font-medium pb-3 pr-6">Sessions</th>
-                            <th class="text-right text-gray-500 font-medium pb-3 pr-6">Energy (kWh)</th>
-                            <th class="text-right text-gray-500 font-medium pb-3 pr-6">Cost (€)</th>
-                            <th class="text-right text-amber-500/80 font-medium pb-3 pr-6">Charge to Company (€)</th>
-                            <th class="text-right text-gray-500 font-medium pb-3 pr-6">Margin (€)</th>
+                            <th data-col="0" class="sortable-header text-left text-gray-500 font-medium pb-3 pr-6 cursor-pointer select-none whitespace-nowrap hover:text-white transition-colors">Month <span class="sort-icon ml-1 text-xs opacity-50">⇅</span></th>
+                            <th data-col="1" class="sortable-header text-right text-gray-500 font-medium pb-3 pr-6 cursor-pointer select-none whitespace-nowrap hover:text-white transition-colors">Sessions <span class="sort-icon ml-1 text-xs opacity-50">⇅</span></th>
+                            <th data-col="2" class="sortable-header text-right text-gray-500 font-medium pb-3 pr-6 cursor-pointer select-none whitespace-nowrap hover:text-white transition-colors">Energy (kWh) <span class="sort-icon ml-1 text-xs opacity-50">⇅</span></th>
+                            <th data-col="3" class="sortable-header text-right text-gray-500 font-medium pb-3 pr-6 cursor-pointer select-none whitespace-nowrap hover:text-white transition-colors">Cost (€) <span class="sort-icon ml-1 text-xs opacity-50">⇅</span></th>
+                            <th data-col="4" class="sortable-header text-right text-amber-500/80 font-medium pb-3 pr-6 cursor-pointer select-none whitespace-nowrap hover:text-amber-300 transition-colors">Charge to Company (€) <span class="sort-icon ml-1 text-xs opacity-50">⇅</span></th>
+                            <th data-col="5" class="sortable-header text-right text-gray-500 font-medium pb-3 pr-6 cursor-pointer select-none whitespace-nowrap hover:text-white transition-colors">Margin (€) <span class="sort-icon ml-1 text-xs opacity-50">⇅</span></th>
                             <th class="text-right text-gray-500 font-medium pb-3">Download</th>
                         </tr>
                     </thead>
@@ -222,6 +223,61 @@
                     y: { ticks: { color: tickColor }, grid: { color: gridColor } }
                 }
             }
+        });
+    })();
+    </script>
+
+    <script>
+    (function() {
+        const table = document.getElementById('monthlyBreakdownTable');
+        if (!table) return;
+        const tbody = table.querySelector('tbody');
+        const headers = table.querySelectorAll('th.sortable-header');
+        let sortCol = -1;
+        let sortAsc = true;
+
+        function cellValue(row, col) {
+            const text = row.cells[col].textContent.trim();
+            const num = parseFloat(text.replace(/,/g, '.'));
+            return isNaN(num) ? text.toLowerCase() : num;
+        }
+
+        headers.forEach(function(th) {
+            th.addEventListener('click', function() {
+                const col = parseInt(th.getAttribute('data-col'), 10);
+                if (sortCol === col) {
+                    sortAsc = !sortAsc;
+                } else {
+                    sortCol = col;
+                    sortAsc = true;
+                }
+
+                headers.forEach(function(h) {
+                    const icon = h.querySelector('.sort-icon');
+                    if (!icon) return;
+                    h.classList.remove('text-white');
+                    h.classList.add('text-gray-500');
+                    icon.textContent = '⇅';
+                    icon.classList.add('opacity-50');
+                });
+                const activeIcon = th.querySelector('.sort-icon');
+                th.classList.remove('text-gray-500');
+                th.classList.add('text-white');
+                if (activeIcon) {
+                    activeIcon.textContent = sortAsc ? '↑' : '↓';
+                    activeIcon.classList.remove('opacity-50');
+                }
+
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                rows.sort(function(a, b) {
+                    const av = cellValue(a, col);
+                    const bv = cellValue(b, col);
+                    if (av < bv) return sortAsc ? -1 : 1;
+                    if (av > bv) return sortAsc ? 1 : -1;
+                    return 0;
+                });
+                rows.forEach(function(row) { tbody.appendChild(row); });
+            });
         });
     })();
     </script>
