@@ -290,6 +290,7 @@ wattpilot-exporter/
 ├── internal/
 │   ├── handlers/
 │   │   ├── dashboard.go     # GET / — monthly dashboard
+│   │   ├── dashboard_test.go
 │   │   ├── charts.go        # GET /charts — historical charts
 │   │   ├── download.go      # GET /download — Excel export
 │   │   └── settings.go      # GET/POST /settings — configuration page
@@ -297,6 +298,7 @@ wattpilot-exporter/
 │   │   └── settings.go      # Settings model, Azure Blob Storage, price fetch
 │   └── wattpilot/
 │       ├── wattpilot.go     # API client, caching, pricing logic
+│       ├── storage.go       # DataStore interface (local + Azure Blob backends)
 │       └── wattpilot_test.go
 ├── templates/               # Server-side HTML templates
 ├── static/                  # CSS, JS, icons, PWA manifest
@@ -314,6 +316,8 @@ wattpilot-exporter/
 | `make build` | Compile the binary |
 | `make run` | Delete cached data and run the app |
 | `make run-cached` | Run the app using cached data |
+| `make sample-init` | Copy local cache/backups into `data/sample/` for sample mode |
+| `make sample` | Run the app with sample data (no API key required) |
 | `make clean` | Remove binary and cached data |
 | `make docker-build` | Build the Docker image |
 | `make docker-run` | Run the Docker container |
