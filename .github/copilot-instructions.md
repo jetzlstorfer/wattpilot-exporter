@@ -25,7 +25,7 @@ Go web application that fetches EV charging session data from the Fronius Wattpi
 - Uses Go's `net/http` standard library with `html/template` — no web framework.
 - **`internal/wattpilot/wattpilot.go`** — Core data layer: API client, JSON caching/refresh, backup fallback, date parsing, price calculation.
 - **`internal/wattpilot/storage.go`** — `DataStore` interface with two backends: `LocalStore` (filesystem) and `AzureBlobStore`. Selected at startup via `InitStore()` based on `AZURE_STORAGE_ACCOUNT_NAME`.
-- **`internal/handlers/`** — HTTP handlers for dashboard (`/`), charts (`/charts`), Excel download (`/download`), refresh (`/refresh`).
+- **`internal/handlers/`** — HTTP handlers for dashboard (`/`), charts (`/charts`), Excel download (`/download`), settings (`/settings`, `/settings/fetch-price`), info (`/info`), and refresh (`/refresh`).
 - **`cmd/server/telemetry.go`** — OpenTelemetry trace + log provider initialisation. Logs use `slog` bridged to OTel.
 - Static assets (Chart.js, Tailwind CSS) are served from `static/`. HTML templates live in `templates/`.
 
@@ -33,11 +33,11 @@ Go web application that fetches EV charging session data from the Fronius Wattpi
 
 - **Date parsing** — Wattpilot API dates use European format, parsed with Go layout `"02.01.2006 15:04:05"`. Month navigation uses `"2006-01"` format throughout.
 - **Electricity prices** — Hardcoded per year as constants in `internal/wattpilot/wattpilot.go` (e.g., `OfficialPricePerKwh2025`, `PurchasePricePerKwh2025`). When adding a new year's rate: add constants, then update the switch statements in `getSellingPriceOfYear`, `getPurchasePriceOfYear`, and `GetOfficialPricePerKwhForMonth`.
-- **Data caching** — The app fetches from the API once and saves to `data/data.json`. Monthly snapshots are written to `data/data-YYYY-MM_backup.json`. Auto-refresh triggers when data is older than `DataTTLMinutes` (60 min). Hit `/refresh` to force re-fetch.
+- **Data caching** — The app fetches from the API once and saves to `data/data.json`. Monthly snapshots are written to `data/data-YYYY-MM_backup.json`. Auto-refresh triggers when data is older than `DataTTLMinutes` (default 60 min, configurable via `/settings`). Hit `/refresh` to force re-fetch.
 - **Refresh safety** — Fetched payloads are parsed/validated before overwriting `data.json`. On failure, existing cached data is preserved and monthly backups remain available. Writes use atomic temp-file + rename.
 - **Historical data starts from June 2024** — `GetPrevMonth` enforces this lower bound.
 - **Observability** — Handlers and core functions create OTel spans via package-level `tracer` variables. Use `slog.InfoContext`/`slog.ErrorContext` (not `log.Printf`) for structured logging.
-- **Tests** — Use table-driven tests with `[]struct` patterns. Tests live alongside code in `_test.go` files within the same package (not a separate `_test` package).
+- **Tests** — Use table-driven tests with `[]struct` patterns. Tests live alongside code in `_test.go` files within the same package (not a separate `_test` package). Example test files: `internal/wattpilot/wattpilot_test.go`, `internal/handlers/dashboard_test.go`.
 
 ## Azure Deployment
 
