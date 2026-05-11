@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 
+	"github.com/jetzlstorfer/wattpilot-exporter/internal/forecast"
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/settings"
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/wattpilot"
 )
@@ -42,6 +43,7 @@ type DashboardData struct {
 	TotalPrice       float64
 	TotalMargin      float64
 	Sessions         []SessionPoint
+	Forecast         forecast.DashboardForecast
 	Error            string
 }
 
@@ -148,6 +150,7 @@ func calculateData(ctx context.Context, date string) (DashboardData, error) {
 	now := time.Now().In(loc)
 	isCurrentMonth := monthToCalculate == now.Format("2006-01")
 	activeSession := isActiveCharging(monthToCalculate, latestSessionEnd, now, loc)
+	dashboardForecast := forecast.GetDashboardForecast(ctx)
 
 	// Subtract monthly network fee from margin (spread across consumption)
 	if len(parsedData.Data) > 0 {
@@ -167,6 +170,7 @@ func calculateData(ctx context.Context, date string) (DashboardData, error) {
 		TotalPrice:       totalPrice,
 		TotalMargin:      totalMargin,
 		Sessions:         sessions,
+		Forecast:         dashboardForecast,
 	}, nil
 }
 

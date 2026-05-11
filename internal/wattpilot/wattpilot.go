@@ -23,6 +23,7 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/settings"
+	"github.com/jetzlstorfer/wattpilot-exporter/internal/storage"
 )
 
 var tracer = otel.Tracer("github.com/jetzlstorfer/wattpilot-exporter/internal/wattpilot")
@@ -167,7 +168,7 @@ func FetchJSON(ctx context.Context, fetchURL string) ([]byte, error) {
 
 // isDataStale checks if the data/data.json file/blob is older than the configured DataTTLMinutes
 func isDataStale(ctx context.Context) bool {
-	modTime, err := globalStore.ModTime(ctx, dataFilePath(JSONFileName))
+	modTime, err := storage.Store().ModTime(ctx, dataFilePath(JSONFileName))
 	if err != nil {
 		// File/blob doesn't exist or can't be accessed - consider it stale
 		return true
@@ -208,7 +209,7 @@ func GetJSONData(ctx context.Context) ([]byte, error) {
 	tryAutoRefresh(ctx)
 
 	// Read JSON document from storage (whether it's fresh or stale)
-	jsonData, err := globalStore.Read(ctx, dataFilePath(JSONFileName))
+	jsonData, err := storage.Store().Read(ctx, dataFilePath(JSONFileName))
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to read JSON data", "error", err)
 		// Don't auto-fetch here anymore - let the caller decide whether to use backup or fetch
@@ -219,11 +220,11 @@ func GetJSONData(ctx context.Context) ([]byte, error) {
 }
 
 func readJSONFile(ctx context.Context, filename string) ([]byte, error) {
-	return globalStore.Read(ctx, filename)
+	return storage.Store().Read(ctx, filename)
 }
 
 func saveJSONFile(ctx context.Context, filename string, jsonData []byte) error {
-	return globalStore.Write(ctx, filename, jsonData)
+	return storage.Store().Write(ctx, filename, jsonData)
 }
 
 func getMonthlyBackupFilename(yearMonth string) string {

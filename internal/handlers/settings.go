@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/settings"
@@ -32,6 +33,12 @@ type SettingsData struct {
 	NetworkFeeMonthly         float64
 	LiveChargingWindowMinutes int
 	DataTTLMinutes            int
+	HomeAddress               string
+	HomeLatitude              float64
+	HomeLongitude             float64
+	PVPeakKW                  float64
+	PVPerformanceFactor       float64
+	ForecastTTLMinutes        int
 	Success                   bool
 	Error                     string
 }
@@ -109,6 +116,59 @@ func SettingsHandler(templateDir string) http.HandlerFunc {
 				}
 			}
 
+			address := r.FormValue("homeAddress")
+			s.HomeAddress = address
+
+			if latitude := r.FormValue("homeLatitude"); latitude != "" {
+				if value, err := strconv.ParseFloat(latitude, 64); err == nil {
+					s.HomeLatitude = value
+				}
+			}
+			if longitude := r.FormValue("homeLongitude"); longitude != "" {
+				if value, err := strconv.ParseFloat(longitude, 64); err == nil {
+					s.HomeLongitude = value
+				}
+			}
+			if peakKW := r.FormValue("pvPeakKW"); peakKW != "" {
+				if value, err := strconv.ParseFloat(peakKW, 64); err == nil && value >= 0 {
+					s.PVPeakKW = value
+				}
+			}
+			if factor := r.FormValue("pvPerformanceFactor"); factor != "" {
+				if value, err := strconv.ParseFloat(factor, 64); err == nil && value > 0 {
+					s.PVPerformanceFactor = value
+				}
+			}
+			if ttl := r.FormValue("forecastTTLMinutes"); ttl != "" {
+				if value, err := strconv.Atoi(ttl); err == nil && value > 0 {
+					s.ForecastTTLMinutes = value
+				}
+			}
+
+			if strings.TrimSpace(address) != "" {
+				lat, lon, _, err := settings.GeocodeAddress(ctx, address)
+				if err != nil {
+					renderSettings(w, templateDir, SettingsData{
+						CarModel:                  s.CarModel,
+						OfficialPrices:            sortedPriceEntries(s.OfficialPrices),
+						PurchasePrices:            sortedPriceEntries(s.PurchasePrices),
+						NetworkFeeMonthly:         s.NetworkFeeMonthly,
+						LiveChargingWindowMinutes: s.LiveChargingWindowMinutes,
+						DataTTLMinutes:            s.DataTTLMinutes,
+						HomeAddress:               s.HomeAddress,
+						HomeLatitude:              s.HomeLatitude,
+						HomeLongitude:             s.HomeLongitude,
+						PVPeakKW:                  s.PVPeakKW,
+						PVPerformanceFactor:       s.PVPerformanceFactor,
+						ForecastTTLMinutes:        s.ForecastTTLMinutes,
+						Error:                     "Failed to geocode address: " + err.Error(),
+					})
+					return
+				}
+				s.HomeLatitude = lat
+				s.HomeLongitude = lon
+			}
+
 			if err := settings.Save(ctx, s); err != nil {
 				slog.ErrorContext(ctx, "settingsHandler: failed to save settings", "error", err)
 				renderSettings(w, templateDir, SettingsData{
@@ -118,6 +178,12 @@ func SettingsHandler(templateDir string) http.HandlerFunc {
 					NetworkFeeMonthly:         s.NetworkFeeMonthly,
 					LiveChargingWindowMinutes: s.LiveChargingWindowMinutes,
 					DataTTLMinutes:            s.DataTTLMinutes,
+					HomeAddress:               s.HomeAddress,
+					HomeLatitude:              s.HomeLatitude,
+					HomeLongitude:             s.HomeLongitude,
+					PVPeakKW:                  s.PVPeakKW,
+					PVPerformanceFactor:       s.PVPerformanceFactor,
+					ForecastTTLMinutes:        s.ForecastTTLMinutes,
 					Error:                     "Failed to save settings: " + err.Error(),
 				})
 				return
@@ -132,6 +198,12 @@ func SettingsHandler(templateDir string) http.HandlerFunc {
 				NetworkFeeMonthly:         current.NetworkFeeMonthly,
 				LiveChargingWindowMinutes: current.LiveChargingWindowMinutes,
 				DataTTLMinutes:            current.DataTTLMinutes,
+				HomeAddress:               current.HomeAddress,
+				HomeLatitude:              current.HomeLatitude,
+				HomeLongitude:             current.HomeLongitude,
+				PVPeakKW:                  current.PVPeakKW,
+				PVPerformanceFactor:       current.PVPerformanceFactor,
+				ForecastTTLMinutes:        current.ForecastTTLMinutes,
 				Success:                   true,
 			})
 			return
@@ -146,6 +218,12 @@ func SettingsHandler(templateDir string) http.HandlerFunc {
 			NetworkFeeMonthly:         current.NetworkFeeMonthly,
 			LiveChargingWindowMinutes: current.LiveChargingWindowMinutes,
 			DataTTLMinutes:            current.DataTTLMinutes,
+			HomeAddress:               current.HomeAddress,
+			HomeLatitude:              current.HomeLatitude,
+			HomeLongitude:             current.HomeLongitude,
+			PVPeakKW:                  current.PVPeakKW,
+			PVPerformanceFactor:       current.PVPerformanceFactor,
+			ForecastTTLMinutes:        current.ForecastTTLMinutes,
 		})
 	}
 }

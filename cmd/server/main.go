@@ -15,7 +15,7 @@ import (
 
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/handlers"
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/settings"
-	"github.com/jetzlstorfer/wattpilot-exporter/internal/wattpilot"
+	"github.com/jetzlstorfer/wattpilot-exporter/internal/storage"
 	"github.com/joho/godotenv"
 )
 
@@ -51,7 +51,7 @@ func main() {
 	slog.SetDefault(logger)
 
 	// Initialise the data store (local filesystem or Azure Blob Storage).
-	wattpilot.InitStore(ctx)
+	storage.InitStore(ctx)
 
 	// Load settings from Azure Blob Storage (falls back to defaults)
 	settings.Load(ctx)
