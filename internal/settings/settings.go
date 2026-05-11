@@ -9,21 +9,18 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/jetzlstorfer/wattpilot-exporter/internal/storage"
 )
 
 const (
-	containerName = "settings"
-	blobName      = "config.json"
-	geocodeURL    = "https://geocoding-api.open-meteo.com/v1/search"
-	nominatimURL  = "https://nominatim.openstreetmap.org/search"
+	settingsPath = "data/config.json"
+	geocodeURL   = "https://geocoding-api.open-meteo.com/v1/search"
+	nominatimURL = "https://nominatim.openstreetmap.org/search"
 )
 
 var settingsHTTPClient = &http.Client{}
@@ -98,53 +95,13 @@ func Get() Settings {
 	return *current
 }
 
-func newBlobClient() (*azblob.Client, error) {
-	endpoint := os.Getenv("AZURE_STORAGE_ENDPOINT")
-	if endpoint == "" {
-		return nil, nil
-	}
-	cred, err := azidentity.NewDefaultAzureCredential(nil)
-	if err != nil {
-		return nil, err
-	}
-	return azblob.NewClient(endpoint, cred, nil)
-}
-
-// Load reads settings from Azure Blob Storage into memory.
-// Falls back to defaults if blob doesn't exist or storage is unavailable.
+// Load reads settings from storage (local filesystem or Azure Blob Storage).
+// Falls back to defaults if settings file doesn't exist or storage is unavailable.
 func Load(ctx context.Context) {
-	client, err := newBlobClient()
-	if err != nil || client == nil {
-		if err != nil {
-			slog.WarnContext(ctx, "settings: failed to create blob client, using defaults", "error", err)
-		} else {
-			slog.InfoContext(ctx, "settings: no AZURE_STORAGE_ENDPOINT set, using defaults")
-		}
-		d := Defaults()
-		mu.Lock()
-		current = &d
-		mu.Unlock()
-		return
-	}
-
-	resp, err := client.DownloadStream(ctx, containerName, blobName, nil)
+	store := storage.Store()
+	data, err := store.Read(ctx, settingsPath)
 	if err != nil {
-		slog.WarnContext(ctx, "settings: failed to download config, using defaults", "error", err)
-		d := Defaults()
-		mu.Lock()
-		current = &d
-		mu.Unlock()
-		return
-	}
-	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			slog.WarnContext(ctx, "settings: failed to close config blob stream", "error", closeErr)
-		}
-	}()
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		slog.WarnContext(ctx, "settings: failed to read config blob, using defaults", "error", err)
+		slog.InfoContext(ctx, "settings: no existing config found, using defaults", "path", settingsPath)
 		d := Defaults()
 		mu.Lock()
 		current = &d
@@ -198,37 +155,26 @@ func Load(ctx context.Context) {
 	mu.Lock()
 	current = &s
 	mu.Unlock()
-	slog.InfoContext(ctx, "settings: loaded from blob storage")
+	slog.InfoContext(ctx, "settings: loaded from storage", "path", settingsPath)
 }
 
-// Save writes the given settings to Azure Blob Storage and updates the cache.
+// Save writes the given settings to storage (local filesystem or Azure Blob Storage) and updates the cache.
 func Save(ctx context.Context, s Settings) error {
-	client, err := newBlobClient()
-	if err != nil {
-		return err
-	}
-	if client == nil {
-		slog.WarnContext(ctx, "settings: no storage endpoint, saving to memory only")
-		mu.Lock()
-		current = &s
-		mu.Unlock()
-		return nil
-	}
+	store := storage.Store()
 
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	_, err = client.UploadBuffer(ctx, containerName, blobName, data, &azblob.UploadBufferOptions{})
-	if err != nil {
+	if err := store.Write(ctx, settingsPath, data); err != nil {
 		return err
 	}
 
 	mu.Lock()
 	current = &s
 	mu.Unlock()
-	slog.InfoContext(ctx, "settings: saved to blob storage")
+	slog.InfoContext(ctx, "settings: saved to storage", "path", settingsPath)
 	return nil
 }
 
