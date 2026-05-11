@@ -8,20 +8,22 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/jetzlstorfer/wattpilot-exporter/internal/storage"
 )
 
 const (
-	containerName = "settings"
-	blobName      = "config.json"
+	settingsPath = "data/config.json"
+	geocodeURL   = "https://geocoding-api.open-meteo.com/v1/search"
+	nominatimURL = "https://nominatim.openstreetmap.org/search"
 )
+
+var settingsHTTPClient = &http.Client{}
 
 // Settings holds all user-configurable application settings.
 type Settings struct {
@@ -31,6 +33,28 @@ type Settings struct {
 	NetworkFeeMonthly         float64            `json:"networkFeeMonthly"`
 	LiveChargingWindowMinutes int                `json:"liveChargingWindowMinutes"`
 	DataTTLMinutes            int                `json:"dataTTLMinutes"`
+	HomeAddress               string             `json:"homeAddress"`
+	HomeLatitude              float64            `json:"homeLatitude"`
+	HomeLongitude             float64            `json:"homeLongitude"`
+	PVPeakKW                  float64            `json:"pvPeakKw"`
+	PVPerformanceFactor       float64            `json:"pvPerformanceFactor"`
+	ForecastTTLMinutes        int                `json:"forecastTTLMinutes"`
+}
+
+type geocodeResponse struct {
+	Results []struct {
+		Name      string  `json:"name"`
+		Latitude  float64 `json:"latitude"`
+		Longitude float64 `json:"longitude"`
+		Country   string  `json:"country"`
+		Admin1    string  `json:"admin1"`
+	} `json:"results"`
+}
+
+type nominatimResponse []struct {
+	Lat         string `json:"lat"`
+	Lon         string `json:"lon"`
+	DisplayName string `json:"display_name"`
 }
 
 var (
@@ -55,6 +79,8 @@ func Defaults() Settings {
 		NetworkFeeMonthly:         4.20,
 		LiveChargingWindowMinutes: 5,
 		DataTTLMinutes:            30,
+		PVPerformanceFactor:       0.82,
+		ForecastTTLMinutes:        120,
 	}
 }
 
@@ -69,49 +95,13 @@ func Get() Settings {
 	return *current
 }
 
-func newBlobClient() (*azblob.Client, error) {
-	endpoint := os.Getenv("AZURE_STORAGE_ENDPOINT")
-	if endpoint == "" {
-		return nil, nil
-	}
-	cred, err := azidentity.NewDefaultAzureCredential(nil)
-	if err != nil {
-		return nil, err
-	}
-	return azblob.NewClient(endpoint, cred, nil)
-}
-
-// Load reads settings from Azure Blob Storage into memory.
-// Falls back to defaults if blob doesn't exist or storage is unavailable.
+// Load reads settings from storage (local filesystem or Azure Blob Storage).
+// Falls back to defaults if settings file doesn't exist or storage is unavailable.
 func Load(ctx context.Context) {
-	client, err := newBlobClient()
-	if err != nil || client == nil {
-		if err != nil {
-			slog.WarnContext(ctx, "settings: failed to create blob client, using defaults", "error", err)
-		} else {
-			slog.InfoContext(ctx, "settings: no AZURE_STORAGE_ENDPOINT set, using defaults")
-		}
-		d := Defaults()
-		mu.Lock()
-		current = &d
-		mu.Unlock()
-		return
-	}
-
-	resp, err := client.DownloadStream(ctx, containerName, blobName, nil)
+	store := storage.Store()
+	data, err := store.Read(ctx, settingsPath)
 	if err != nil {
-		slog.WarnContext(ctx, "settings: failed to download config, using defaults", "error", err)
-		d := Defaults()
-		mu.Lock()
-		current = &d
-		mu.Unlock()
-		return
-	}
-	defer resp.Body.Close()
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		slog.WarnContext(ctx, "settings: failed to read config blob, using defaults", "error", err)
+		slog.InfoContext(ctx, "settings: no existing config found, using defaults", "path", settingsPath)
 		d := Defaults()
 		mu.Lock()
 		current = &d
@@ -155,41 +145,36 @@ func Load(ctx context.Context) {
 	if s.DataTTLMinutes <= 0 {
 		s.DataTTLMinutes = d.DataTTLMinutes
 	}
+	if s.PVPerformanceFactor <= 0 || s.PVPerformanceFactor > 1.2 {
+		s.PVPerformanceFactor = d.PVPerformanceFactor
+	}
+	if s.ForecastTTLMinutes <= 0 {
+		s.ForecastTTLMinutes = d.ForecastTTLMinutes
+	}
 
 	mu.Lock()
 	current = &s
 	mu.Unlock()
-	slog.InfoContext(ctx, "settings: loaded from blob storage")
+	slog.InfoContext(ctx, "settings: loaded from storage", "path", settingsPath)
 }
 
-// Save writes the given settings to Azure Blob Storage and updates the cache.
+// Save writes the given settings to storage (local filesystem or Azure Blob Storage) and updates the cache.
 func Save(ctx context.Context, s Settings) error {
-	client, err := newBlobClient()
-	if err != nil {
-		return err
-	}
-	if client == nil {
-		slog.WarnContext(ctx, "settings: no storage endpoint, saving to memory only")
-		mu.Lock()
-		current = &s
-		mu.Unlock()
-		return nil
-	}
+	store := storage.Store()
 
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	_, err = client.UploadBuffer(ctx, containerName, blobName, data, &azblob.UploadBufferOptions{})
-	if err != nil {
+	if err := store.Write(ctx, settingsPath, data); err != nil {
 		return err
 	}
 
 	mu.Lock()
 	current = &s
 	mu.Unlock()
-	slog.InfoContext(ctx, "settings: saved to blob storage")
+	slog.InfoContext(ctx, "settings: saved to storage", "path", settingsPath)
 	return nil
 }
 
@@ -245,7 +230,11 @@ func FetchSteirerStromFlexPrice() (float64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch tarife.at page: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			slog.Warn("settings: failed to close tarife.at response body", "error", closeErr)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -299,6 +288,40 @@ func GetDataTTLMinutes() int {
 	return s.DataTTLMinutes
 }
 
+// GetForecastAddress returns the configured home address.
+func GetForecastAddress() string {
+	return Get().HomeAddress
+}
+
+// GetForecastCoordinates returns the configured home latitude and longitude.
+func GetForecastCoordinates() (float64, float64) {
+	s := Get()
+	return s.HomeLatitude, s.HomeLongitude
+}
+
+// GetPVPeakKW returns the configured PV system size in kWp.
+func GetPVPeakKW() float64 {
+	return Get().PVPeakKW
+}
+
+// GetPVPerformanceFactor returns the configured PV performance factor.
+func GetPVPerformanceFactor() float64 {
+	s := Get()
+	if s.PVPerformanceFactor <= 0 || s.PVPerformanceFactor > 1.2 {
+		return Defaults().PVPerformanceFactor
+	}
+	return s.PVPerformanceFactor
+}
+
+// GetForecastTTLMinutes returns the forecast cache TTL in minutes.
+func GetForecastTTLMinutes() int {
+	s := Get()
+	if s.ForecastTTLMinutes <= 0 {
+		return Defaults().ForecastTTLMinutes
+	}
+	return s.ForecastTTLMinutes
+}
+
 // ToJSON returns the settings as a formatted JSON reader (for blob upload).
 func (s Settings) ToJSON() (*bytes.Reader, error) {
 	data, err := json.MarshalIndent(s, "", "  ")
@@ -306,4 +329,118 @@ func (s Settings) ToJSON() (*bytes.Reader, error) {
 		return nil, err
 	}
 	return bytes.NewReader(data), nil
+}
+
+// GeocodeAddress resolves a free-form street address into latitude and longitude.
+func GeocodeAddress(ctx context.Context, address string) (float64, float64, string, error) {
+	trimmed := strings.TrimSpace(address)
+	if trimmed == "" {
+		return 0, 0, "", fmt.Errorf("address is empty")
+	}
+
+	lat, lon, label, err := geocodeWithOpenMeteo(ctx, trimmed)
+	if err == nil {
+		return lat, lon, label, nil
+	}
+
+	lat, lon, label, fallbackErr := geocodeWithNominatim(ctx, trimmed)
+	if fallbackErr == nil {
+		return lat, lon, label, nil
+	}
+
+	return 0, 0, "", fmt.Errorf("%w; fallback geocoder also failed: %v", err, fallbackErr)
+}
+
+func geocodeWithOpenMeteo(ctx context.Context, address string) (float64, float64, string, error) {
+
+	query := url.Values{}
+	query.Set("name", address)
+	query.Set("count", "1")
+	query.Set("language", "en")
+	query.Set("format", "json")
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, geocodeURL+"?"+query.Encode(), nil)
+	if err != nil {
+		return 0, 0, "", fmt.Errorf("failed to create geocoding request: %w", err)
+	}
+
+	resp, err := settingsHTTPClient.Do(req)
+	if err != nil {
+		return 0, 0, "", fmt.Errorf("failed to geocode address: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return 0, 0, "", fmt.Errorf("geocoding API returned status %d", resp.StatusCode)
+	}
+
+	var data geocodeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return 0, 0, "", fmt.Errorf("failed to decode geocoding response: %w", err)
+	}
+	if len(data.Results) == 0 {
+		return 0, 0, "", fmt.Errorf("no coordinates found for %q", address)
+	}
+
+	match := data.Results[0]
+	parts := []string{match.Name, match.Admin1, match.Country}
+	locationName := strings.Join(filterEmpty(parts), ", ")
+	return match.Latitude, match.Longitude, locationName, nil
+}
+
+func geocodeWithNominatim(ctx context.Context, address string) (float64, float64, string, error) {
+	query := url.Values{}
+	query.Set("q", address)
+	query.Set("format", "jsonv2")
+	query.Set("limit", "1")
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, nominatimURL+"?"+query.Encode(), nil)
+	if err != nil {
+		return 0, 0, "", fmt.Errorf("failed to create fallback geocoding request: %w", err)
+	}
+	req.Header.Set("User-Agent", "wattpilot-exporter/1.0")
+
+	resp, err := settingsHTTPClient.Do(req)
+	if err != nil {
+		return 0, 0, "", fmt.Errorf("failed to geocode address with fallback provider: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return 0, 0, "", fmt.Errorf("fallback geocoding API returned status %d", resp.StatusCode)
+	}
+
+	var data nominatimResponse
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return 0, 0, "", fmt.Errorf("failed to decode fallback geocoding response: %w", err)
+	}
+	if len(data) == 0 {
+		return 0, 0, "", fmt.Errorf("no coordinates found for %q", address)
+	}
+
+	lat, err := strconv.ParseFloat(data[0].Lat, 64)
+	if err != nil {
+		return 0, 0, "", fmt.Errorf("failed to parse fallback latitude %q: %w", data[0].Lat, err)
+	}
+	lon, err := strconv.ParseFloat(data[0].Lon, 64)
+	if err != nil {
+		return 0, 0, "", fmt.Errorf("failed to parse fallback longitude %q: %w", data[0].Lon, err)
+	}
+
+	return lat, lon, data[0].DisplayName, nil
+}
+
+func filterEmpty(values []string) []string {
+	filtered := make([]string, 0, len(values))
+	for _, value := range values {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		filtered = append(filtered, value)
+	}
+	return filtered
 }

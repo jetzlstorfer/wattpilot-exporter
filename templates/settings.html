@@ -160,6 +160,51 @@
                 </div>
             </div>
 
+            <!-- Forecast Settings -->
+            <div class="card rounded-2xl p-6 mb-6">
+                <h2 class="text-lg font-bold text-white mb-1">Weather and PV Forecast</h2>
+                <p class="text-sm text-gray-500 mb-6">Use either a street address or direct coordinates. If an address is provided, the app geocodes it and uses the resolved coordinates for forecasts.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+                    <div class="md:col-span-2">
+                        <label for="homeAddress" class="block text-sm font-medium text-gray-400 mb-2">Street address</label>
+                        <input type="text" id="homeAddress" name="homeAddress" value="{{ .HomeAddress }}"
+                            class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                            placeholder="Herrengasse 1, Graz, Austria">
+                        <p class="text-xs text-gray-600 mt-2">Optional alternative to latitude and longitude. Saving will resolve the address to coordinates automatically.</p>
+                    </div>
+                    <div>
+                        <label for="homeLatitude" class="block text-sm font-medium text-gray-400 mb-2">Latitude</label>
+                        <input type="number" step="0.00001" id="homeLatitude" name="homeLatitude" value="{{ printf "%.5f" .HomeLatitude }}"
+                            class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                        <p class="text-xs text-gray-600 mt-2">Used directly if you prefer manual coordinates.</p>
+                    </div>
+                    <div>
+                        <label for="homeLongitude" class="block text-sm font-medium text-gray-400 mb-2">Longitude</label>
+                        <input type="number" step="0.00001" id="homeLongitude" name="homeLongitude" value="{{ printf "%.5f" .HomeLongitude }}"
+                            class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                        <p class="text-xs text-gray-600 mt-2">Used directly if you prefer manual coordinates.</p>
+                    </div>
+                    <div>
+                        <label for="pvPeakKW" class="block text-sm font-medium text-gray-400 mb-2">PV size (kWp)</label>
+                        <input type="number" step="0.1" min="0" id="pvPeakKW" name="pvPeakKW" value="{{ printf "%.1f" .PVPeakKW }}"
+                            class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                        <p class="text-xs text-gray-600 mt-2">Leave at 0 if you only want the weather forecast.</p>
+                    </div>
+                    <div>
+                        <label for="pvPerformanceFactor" class="block text-sm font-medium text-gray-400 mb-2">PV performance factor</label>
+                        <input type="number" step="0.01" min="0.1" max="1.2" id="pvPerformanceFactor" name="pvPerformanceFactor" value="{{ printf "%.2f" .PVPerformanceFactor }}"
+                            class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                        <p class="text-xs text-gray-600 mt-2">Accounts for inverter, cable, and temperature losses. A reasonable default is 0.82.</p>
+                    </div>
+                    <div>
+                        <label for="forecastTTLMinutes" class="block text-sm font-medium text-gray-400 mb-2">Forecast refresh interval (minutes)</label>
+                        <input type="number" step="1" min="1" id="forecastTTLMinutes" name="forecastTTLMinutes" value="{{ .ForecastTTLMinutes }}"
+                            class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                        <p class="text-xs text-gray-600 mt-2">Forecast data is cached separately from charging history.</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Submit -->
             <div class="flex justify-end mt-4">
                 <button type="submit" class="ml-2 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-lg shadow-emerald-900/30">

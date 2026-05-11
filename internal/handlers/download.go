@@ -69,7 +69,11 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	f := excelize.NewFile()
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			slog.ErrorContext(ctx, "downloadHandler: failed to close excel file", "error", err)
+		}
+	}()
 
 	sheet := "Sheet1"
 

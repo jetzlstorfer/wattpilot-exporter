@@ -1,6 +1,11 @@
 body { font-family: 'Inter', sans-serif; }
 .card { background: rgba(17,24,39,0.8); border: 1px solid rgba(255,255,255,0.07); backdrop-filter: blur(12px); }
 .glow { box-shadow: 0 0 20px rgba(59,130,246,0.15); }
+.forecast-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
 @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
 .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
 html:not(.dark) body { background: #f8fafc !important; color: #0f172a !important; }
@@ -34,6 +39,7 @@ html:not(.dark) .nav-links.open { background: rgba(255,255,255,0.98); border-col
     nav { padding-left: 1rem; padding-right: 1rem; }
     main { padding-left: 1rem; padding-right: 1rem; }
     footer { padding-left: 1rem; padding-right: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+    .forecast-summary-grid { grid-template-columns: 1fr; }
     .text-4xl { font-size: 1.875rem; line-height: 2.25rem; }
     .text-3xl { font-size: 1.5rem; line-height: 2rem; }
     .p-6 { padding: 1rem; }

@@ -1,4 +1,4 @@
-package wattpilot
+package storage
 
 import (
 	"bytes"
@@ -18,22 +18,14 @@ import (
 
 // DataStore abstracts the underlying storage backend (local filesystem or Azure Blob Storage).
 type DataStore interface {
-	// Read returns the contents of the named file/blob.
 	Read(ctx context.Context, name string) ([]byte, error)
-	// Write persists data under the given name, creating or replacing it atomically.
 	Write(ctx context.Context, name string, data []byte) error
-	// ModTime returns the last-modified time of the named file/blob.
-	// Returns os.ErrNotExist if the file/blob does not exist.
 	ModTime(ctx context.Context, name string) (time.Time, error)
 }
 
-// globalStore is the active DataStore, initialised by InitStore.
 var globalStore DataStore = LocalStore{}
 
 // InitStore selects the storage backend based on environment variables.
-// If AZURE_STORAGE_ACCOUNT_NAME is set, Azure Blob Storage is used with
-// DefaultAzureCredential (managed identity in Azure, az-login locally).
-// Otherwise, the local filesystem is used.
 func InitStore(ctx context.Context) {
 	accountName := os.Getenv("AZURE_STORAGE_ACCOUNT_NAME")
 	if accountName == "" {
@@ -71,9 +63,10 @@ func InitStore(ctx context.Context) {
 	globalStore = &AzureBlobStore{containerClient: containerClient}
 }
 
-// ---------------------------------------------------------------------------
-// LocalStore – local filesystem implementation
-// ---------------------------------------------------------------------------
+// Store returns the active storage backend.
+func Store() DataStore {
+	return globalStore
+}
 
 // LocalStore implements DataStore using the local filesystem.
 type LocalStore struct{}
@@ -83,7 +76,9 @@ func (LocalStore) Read(_ context.Context, name string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 	return io.ReadAll(f)
 }
 
@@ -92,7 +87,6 @@ func (LocalStore) Write(_ context.Context, name string, data []byte) error {
 		return fmt.Errorf("failed to create directory for %s: %v", name, err)
 	}
 
-	// Write to a temp file first, then rename atomically.
 	tmpFile, err := os.CreateTemp(filepath.Dir(name), ".tmp-wattpilot-*.json")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %v", err)
@@ -102,16 +96,22 @@ func (LocalStore) Write(_ context.Context, name string, data []byte) error {
 	_, writeErr := tmpFile.Write(data)
 	closeErr := tmpFile.Close()
 	if writeErr != nil {
-		os.Remove(tmpName)
+		if removeErr := os.Remove(tmpName); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			return fmt.Errorf("failed to write data: %v (cleanup error: %v)", writeErr, removeErr)
+		}
 		return fmt.Errorf("failed to write data: %v", writeErr)
 	}
 	if closeErr != nil {
-		os.Remove(tmpName)
+		if removeErr := os.Remove(tmpName); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			return fmt.Errorf("failed to close temp file: %v (cleanup error: %v)", closeErr, removeErr)
+		}
 		return fmt.Errorf("failed to close temp file: %v", closeErr)
 	}
 
 	if err := os.Rename(tmpName, name); err != nil {
-		os.Remove(tmpName)
+		if removeErr := os.Remove(tmpName); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			return fmt.Errorf("failed to rename temp file to %s: %v (cleanup error: %v)", name, err, removeErr)
+		}
 		return fmt.Errorf("failed to rename temp file to %s: %v", name, err)
 	}
 	return nil
@@ -124,10 +124,6 @@ func (LocalStore) ModTime(_ context.Context, name string) (time.Time, error) {
 	}
 	return fi.ModTime(), nil
 }
-
-// ---------------------------------------------------------------------------
-// AzureBlobStore – Azure Blob Storage implementation
-// ---------------------------------------------------------------------------
 
 // AzureBlobStore implements DataStore using Azure Blob Storage.
 type AzureBlobStore struct {
@@ -142,7 +138,9 @@ func (s *AzureBlobStore) Read(ctx context.Context, name string) ([]byte, error) 
 		}
 		return nil, fmt.Errorf("failed to download blob %s: %w", name, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	return io.ReadAll(resp.Body)
 }
 
@@ -168,7 +166,6 @@ func (s *AzureBlobStore) ModTime(ctx context.Context, name string) (time.Time, e
 	return *resp.LastModified, nil
 }
 
-// isBlobNotFound reports whether the Azure SDK error represents a 404.
 func isBlobNotFound(err error) bool {
 	var respErr interface{ StatusCode() int }
 	if errors.As(err, &respErr) {

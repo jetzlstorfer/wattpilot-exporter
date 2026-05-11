@@ -30,6 +30,8 @@ wattpilot-exporter
 
 # data
 data/data.json
+data/forecast
+data/config.json
 data/*_backup.json
 *ladeabrechnung.xlsx
 

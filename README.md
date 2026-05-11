@@ -9,7 +9,9 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 - **Charge to Company** — prominent display of the amount to invoice your employer (official Sachbezug rate × energy)
 - **Historical charts** — visualize energy consumption and costs over time (data since June 2024)
 - **Excel export** — download a per-month `.xlsx` billing report with detailed session data, cost summary, and charge-to-company amount
-- **Configurable settings** — in-app settings page to manage car model, official rates, purchase prices (per month), and network fees — persisted in Azure Blob Storage
+- **Weather + PV forecast** — dashboard charging outlook with next 24h weather, estimated PV production, and a recommended charging window
+- **Configurable settings** — in-app settings page to manage car model, official rates, purchase prices (per month), network fees, and forecast location/PV parameters — persisted in Azure Blob Storage
+- **Address geocoding** — configure forecast location via street address or direct latitude/longitude; street addresses are geocoded automatically
 - **SteirerStrom Flex price fetch** — one-click fetch of the current electricity price from [tarife.at](https://www.tarife.at/energie/anbieter/energie-steiermark/steirerstrom-flex-391)
 - **Entra ID authentication** — Azure Easy Auth restricts access to your Azure AD tenant
 - **Custom domain support** — CNAME + managed TLS certificate configured in Bicep
@@ -230,6 +232,12 @@ After deployment, visit `/settings` to configure:
 - **Official rates** — Austrian Sachbezug rates per year/month
 - **Purchase prices** — your actual electricity cost per kWh (use "Fetch SteirerStrom Flex" or enter manually)
 - **Network fee** — monthly flat grid fee (default €4.20)
+- **Forecast location** — either a street address (auto-geocoded) or direct latitude/longitude
+- **PV forecast inputs** — PV system size (kWp), performance factor, and forecast refresh interval
+
+Address geocoding details:
+- Street addresses are resolved with Open-Meteo geocoding first.
+- If Open-Meteo cannot resolve a street-level address, the app automatically falls back to OpenStreetMap Nominatim.
 
 ## Routes
 
@@ -238,7 +246,7 @@ After deployment, visit `/settings` to configure:
 | `/` | Monthly dashboard (use `?date=YYYY-MM` to navigate) |
 | `/charts` | Historical charts across all months |
 | `/download` | Download monthly Excel report (`?date=YYYY-MM`) |
-| `/settings` | Configure pricing, car model, and network fee |
+| `/settings` | Configure pricing, car model, network fee, and forecast settings |
 | `/settings/fetch-price` | API: fetch current SteirerStrom Flex price from tarife.at |
 | `/info` | Info page |
 | `/refresh` | Force re-fetch of data from the Wattpilot API |
@@ -294,11 +302,16 @@ wattpilot-exporter/
 │   │   ├── charts.go        # GET /charts — historical charts
 │   │   ├── download.go      # GET /download — Excel export
 │   │   └── settings.go      # GET/POST /settings — configuration page
+│   ├── forecast/
+│   │   ├── forecast.go       # Weather/PV forecast service + caching + recommendation logic
+│   │   └── forecast_test.go
 │   ├── settings/
-│   │   └── settings.go      # Settings model, Azure Blob Storage, price fetch
+│   │   ├── settings.go       # Settings model, geocoding, Azure Blob Storage, price fetch
+│   │   └── settings_test.go
+│   ├── storage/
+│   │   └── storage.go        # Shared storage abstraction (local + Azure Blob)
 │   └── wattpilot/
 │       ├── wattpilot.go     # API client, caching, pricing logic
-│       ├── storage.go       # DataStore interface (local + Azure Blob backends)
 │       └── wattpilot_test.go
 ├── templates/               # Server-side HTML templates
 ├── static/                  # CSS, JS, icons, PWA manifest
