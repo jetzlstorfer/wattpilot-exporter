@@ -273,7 +273,9 @@ func fetchForecast(ctx context.Context, lat float64, lon float64) ([]byte, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch forecast: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("forecast API returned status %d", resp.StatusCode)

@@ -76,7 +76,9 @@ func (LocalStore) Read(_ context.Context, name string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 	return io.ReadAll(f)
 }
 
@@ -94,16 +96,22 @@ func (LocalStore) Write(_ context.Context, name string, data []byte) error {
 	_, writeErr := tmpFile.Write(data)
 	closeErr := tmpFile.Close()
 	if writeErr != nil {
-		os.Remove(tmpName)
+		if removeErr := os.Remove(tmpName); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			return fmt.Errorf("failed to write data: %v (cleanup error: %v)", writeErr, removeErr)
+		}
 		return fmt.Errorf("failed to write data: %v", writeErr)
 	}
 	if closeErr != nil {
-		os.Remove(tmpName)
+		if removeErr := os.Remove(tmpName); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			return fmt.Errorf("failed to close temp file: %v (cleanup error: %v)", closeErr, removeErr)
+		}
 		return fmt.Errorf("failed to close temp file: %v", closeErr)
 	}
 
 	if err := os.Rename(tmpName, name); err != nil {
-		os.Remove(tmpName)
+		if removeErr := os.Remove(tmpName); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			return fmt.Errorf("failed to rename temp file to %s: %v (cleanup error: %v)", name, err, removeErr)
+		}
 		return fmt.Errorf("failed to rename temp file to %s: %v", name, err)
 	}
 	return nil
@@ -130,7 +138,9 @@ func (s *AzureBlobStore) Read(ctx context.Context, name string) ([]byte, error) 
 		}
 		return nil, fmt.Errorf("failed to download blob %s: %w", name, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	return io.ReadAll(resp.Body)
 }
 

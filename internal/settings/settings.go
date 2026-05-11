@@ -136,7 +136,11 @@ func Load(ctx context.Context) {
 		mu.Unlock()
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			slog.WarnContext(ctx, "settings: failed to close config blob stream", "error", closeErr)
+		}
+	}()
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -280,7 +284,11 @@ func FetchSteirerStromFlexPrice() (float64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch tarife.at page: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			slog.Warn("settings: failed to close tarife.at response body", "error", closeErr)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -414,7 +422,9 @@ func geocodeWithOpenMeteo(ctx context.Context, address string) (float64, float64
 	if err != nil {
 		return 0, 0, "", fmt.Errorf("failed to geocode address: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return 0, 0, "", fmt.Errorf("geocoding API returned status %d", resp.StatusCode)
@@ -450,7 +460,9 @@ func geocodeWithNominatim(ctx context.Context, address string) (float64, float64
 	if err != nil {
 		return 0, 0, "", fmt.Errorf("failed to geocode address with fallback provider: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return 0, 0, "", fmt.Errorf("fallback geocoding API returned status %d", resp.StatusCode)

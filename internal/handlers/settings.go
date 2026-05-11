@@ -236,7 +236,9 @@ func FetchPriceHandler(w http.ResponseWriter, r *http.Request) {
 		slog.Error("fetchPriceHandler: failed to fetch price", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		if encodeErr := json.NewEncoder(w).Encode(map[string]string{"error": err.Error()}); encodeErr != nil {
+			slog.Error("fetchPriceHandler: failed to encode error response", "error", encodeErr)
+		}
 		return
 	}
 
@@ -252,7 +254,9 @@ func FetchPriceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"price": price, "month": month})
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{"price": price, "month": month}); err != nil {
+		slog.Error("fetchPriceHandler: failed to encode success response", "error", err)
+	}
 }
 
 func renderSettings(w http.ResponseWriter, templateDir string, data SettingsData) {

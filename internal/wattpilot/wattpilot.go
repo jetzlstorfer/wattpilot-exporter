@@ -153,7 +153,9 @@ func FetchJSON(ctx context.Context, fetchURL string) ([]byte, error) {
 		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to fetch JSON: %v", err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	span.SetAttributes(attribute.Int("http.status_code", response.StatusCode))
 
