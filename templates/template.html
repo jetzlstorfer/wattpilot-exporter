@@ -98,6 +98,79 @@
             {{ end }}
         {{ end }}
 
+        <!-- Charge to Company banner -->
+        {{ if .Sessions }}
+        <div class="card rounded-2xl p-6 mb-6 border border-amber-500/20 bg-gradient-to-r from-amber-950/30 to-transparent">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-2xl">🧾</span>
+                        <span class="text-xs font-semibold uppercase tracking-wider text-amber-400">Charge to Company</span>
+                    </div>
+                    <div class="text-4xl font-extrabold text-amber-400">€ {{ printf "%.2f" .TotalPrice }}</div>
+                    <div class="text-sm text-gray-400 mt-1">Amount to invoice your employer for {{ .FormattedDate }}</div>
+                </div>
+            </div>
+        </div>
+        {{ end }}
+
+        <!-- KPI cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="card rounded-2xl p-6 glow">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-2xl">⚡</span>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Energy</span>
+                </div>
+                <div class="text-3xl font-extrabold text-white">{{ printf "%.2f" .TotalEnergy }}</div>
+                <div class="text-sm text-gray-500 mt-1">kWh charged</div>
+            </div>
+            <div class="card rounded-2xl p-6">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-2xl">💶</span>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Cost</span>
+                </div>
+                <div class="text-3xl font-extrabold text-white">{{ printf "%.2f" .TotalPrice }}</div>
+                <div class="text-sm text-gray-500 mt-1">€ (official rate)</div>
+            </div>
+            <div class="card rounded-2xl p-6">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-2xl">📈</span>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Est. Savings</span>
+                </div>
+                <div class="text-3xl font-extrabold text-emerald-400">{{ printf "%.2f" .TotalMargin }}</div>
+                <div class="text-sm text-gray-500 mt-1">€ margin</div>
+            </div>
+            <div class="card rounded-2xl p-6">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-2xl">🔌</span>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Sessions</span>
+                </div>
+                <div class="text-3xl font-extrabold text-blue-400">{{ .ChargingSessions }}</div>
+                <div class="text-sm text-gray-500 mt-1">charging sessions</div>
+            </div>
+        </div>
+
+        <!-- Chart -->
+        {{ if .Sessions }}
+        <div class="card rounded-2xl p-6 mb-8">
+            <h2 class="text-lg font-bold text-white mb-1">Charging Sessions</h2>
+            <p class="text-sm text-gray-500 mb-6">Energy (kWh) and cost (€) per session</p>
+            <div class="relative" style="height:280px;">
+                <canvas id="sessionsChart"></canvas>
+            </div>
+        </div>
+        {{ end }}
+
+        <!-- Latest session footer -->
+        {{ if not .IsCharging }}
+        {{ if .LatestSession }}
+        <div class="card rounded-2xl px-6 py-4 flex items-center gap-3 mb-8">
+            <span class="text-gray-500 text-sm">🕒 Latest session ended:</span>
+            <span class="text-gray-300 font-medium text-sm">{{ .LatestSession }}</span>
+        </div>
+        {{ end }}
+        {{ end }}
+
         <!-- Charging outlook -->
         <div class="card rounded-2xl p-6 mb-8 border border-sky-500/20 bg-gradient-to-br from-sky-950/40 via-transparent to-emerald-950/20">
             <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
@@ -211,79 +284,6 @@
             </div>
             {{ end }}
         </div>
-
-        <!-- Charge to Company banner -->
-        {{ if .Sessions }}
-        <div class="card rounded-2xl p-6 mb-6 border border-amber-500/20 bg-gradient-to-r from-amber-950/30 to-transparent">
-            <div class="flex items-center justify-between">
-                <div>
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="text-2xl">🧾</span>
-                        <span class="text-xs font-semibold uppercase tracking-wider text-amber-400">Charge to Company</span>
-                    </div>
-                    <div class="text-4xl font-extrabold text-amber-400">€ {{ printf "%.2f" .TotalPrice }}</div>
-                    <div class="text-sm text-gray-400 mt-1">Amount to invoice your employer for {{ .FormattedDate }}</div>
-                </div>
-            </div>
-        </div>
-        {{ end }}
-
-        <!-- KPI cards -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div class="card rounded-2xl p-6 glow">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="text-2xl">⚡</span>
-                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Energy</span>
-                </div>
-                <div class="text-3xl font-extrabold text-white">{{ printf "%.2f" .TotalEnergy }}</div>
-                <div class="text-sm text-gray-500 mt-1">kWh charged</div>
-            </div>
-            <div class="card rounded-2xl p-6">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="text-2xl">💶</span>
-                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Cost</span>
-                </div>
-                <div class="text-3xl font-extrabold text-white">{{ printf "%.2f" .TotalPrice }}</div>
-                <div class="text-sm text-gray-500 mt-1">€ (official rate)</div>
-            </div>
-            <div class="card rounded-2xl p-6">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="text-2xl">📈</span>
-                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Est. Savings</span>
-                </div>
-                <div class="text-3xl font-extrabold text-emerald-400">{{ printf "%.2f" .TotalMargin }}</div>
-                <div class="text-sm text-gray-500 mt-1">€ margin</div>
-            </div>
-            <div class="card rounded-2xl p-6">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="text-2xl">🔌</span>
-                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Sessions</span>
-                </div>
-                <div class="text-3xl font-extrabold text-blue-400">{{ .ChargingSessions }}</div>
-                <div class="text-sm text-gray-500 mt-1">charging sessions</div>
-            </div>
-        </div>
-
-        <!-- Chart -->
-        {{ if .Sessions }}
-        <div class="card rounded-2xl p-6 mb-8">
-            <h2 class="text-lg font-bold text-white mb-1">Charging Sessions</h2>
-            <p class="text-sm text-gray-500 mb-6">Energy (kWh) and cost (€) per session</p>
-            <div class="relative" style="height:280px;">
-                <canvas id="sessionsChart"></canvas>
-            </div>
-        </div>
-        {{ end }}
-
-        <!-- Latest session footer -->
-        {{ if not .IsCharging }}
-        {{ if .LatestSession }}
-        <div class="card rounded-2xl px-6 py-4 flex items-center gap-3">
-            <span class="text-gray-500 text-sm">🕒 Latest session ended:</span>
-            <span class="text-gray-300 font-medium text-sm">{{ .LatestSession }}</span>
-        </div>
-        {{ end }}
-        {{ end }}
 
     </main>
 
