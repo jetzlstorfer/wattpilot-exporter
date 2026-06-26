@@ -88,3 +88,6 @@ docker-build:
 
 docker-run:
 	docker run --env-file ./.env -p 8080:8080 jetzlstorfer/wattpilot-exporter:local
+
+lint:
+	golangci-lint run ./...

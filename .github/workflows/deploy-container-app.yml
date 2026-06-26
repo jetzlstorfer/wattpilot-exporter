@@ -35,10 +35,12 @@ jobs:
           cache: true
 
       - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
       - name: Run golangci-lint
-        run: ~/go/bin/golangci-lint run
+        run: make lint
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
