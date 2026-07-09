@@ -27,6 +27,11 @@
     },
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
+ 	"mounts": [
+		"source=${localEnv:HOME}/.config/gh,target=/home/vscode/.config/gh,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.azure,target=/home/vscode/.azure,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.git-credentials,target=/home/vscode/.git-credentials,type=bind,consistency=cached"
+	],
   "postCreateCommand": "go mod download",
   "remoteEnv": {
     "WATTPILOT_KEY": "${localEnv:WATTPILOT_KEY}"
