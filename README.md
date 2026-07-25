@@ -1,3 +1,5 @@
+[![Build and Deploy with AZD](https://github.com/jetzlstorfer/wattpilot-exporter/actions/workflows/deploy-container-app.yml/badge.svg)](https://github.com/jetzlstorfer/wattpilot-exporter/actions/workflows/deploy-container-app.yml)
+
 # Wattpilot Data Exporter ⚡
 
 A lightweight Go web application that fetches EV charging session data from [Fronius Wattpilot](https://www.fronius.com/en/solar-energy/installers-partners/products-solutions/e-mobility/wattpilot) and calculates monthly charging costs based on the official Austrian government electricity rates ([BMF Sachbezug](https://www.bmf.gv.at/themen/steuern/arbeitnehmerveranlagung/pendlerfoerderung-das-pendlerpauschale/sachbezug-kraftfahrzeug.html)).
