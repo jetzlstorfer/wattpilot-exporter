@@ -19,7 +19,6 @@ build:
 
 # Run the application
 run:
-	rm -f data/data.json
 	@pid=`command -v lsof >/dev/null 2>&1 && lsof -ti tcp:8080 -sTCP:LISTEN 2>/dev/null | head -n 1 || true`; \
 	if [ -n "$$pid" ]; then \
 		echo "Port 8080 already in use (PID $$pid). Stopping old process..."; \
@@ -29,7 +28,8 @@ run:
 	@(sleep 2; [ -n "$$BROWSER" ] && "$$BROWSER" http://localhost:8080 >/dev/null 2>&1 || true) &
 	$(GO) run $(RUN_FLAGS) ./cmd/server
 
-run-cached: # don't delete data/data.json before running
+run-clean: # run the application after removing data/data.json (to force a fresh export)
+	rm -f data/data.json
 	@pid=`command -v lsof >/dev/null 2>&1 && lsof -ti tcp:8080 -sTCP:LISTEN 2>/dev/null | head -n 1 || true`; \
 	if [ -n "$$pid" ]; then \
 		echo "Port 8080 already in use (PID $$pid). Stopping old process..."; \
