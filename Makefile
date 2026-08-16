@@ -91,3 +91,6 @@ docker-run:
 
 lint:
 	golangci-lint run ./...
+
+govulncheck:
+	govulncheck ./...
