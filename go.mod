@@ -1,6 +1,6 @@
 module github.com/jetzlstorfer/wattpilot-exporter
 
-go 1.25.4
+go 1.26.6
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.0
