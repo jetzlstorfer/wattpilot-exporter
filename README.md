@@ -28,7 +28,7 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 
 ## Prerequisites
 
-- **Go 1.25+** (or Docker)
+- **Go 1.27+** (or Docker)
 - A **Wattpilot API key** (`WATTPILOT_KEY`)
 
 ## Configuration
