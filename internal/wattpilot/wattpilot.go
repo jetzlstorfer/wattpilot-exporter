@@ -157,7 +157,7 @@ func FetchJSON(ctx context.Context, fetchURL string) ([]byte, error) {
 
 	span.SetAttributes(attribute.Int("http.status_code", response.StatusCode))
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("Wattpilot API returned status %d", response.StatusCode)
+		return nil, fmt.Errorf("wattpilot API returned status %d", response.StatusCode)
 	}
 
 	jsonData, err := io.ReadAll(response.Body)
