@@ -96,7 +96,7 @@ This creates the following resources in Azure:
   - User-assigned **Managed Identity** for Key Vault secret resolution
   - System-assigned **Managed Identity** for Azure Blob Storage access
   - External ingress on port 8080 (publicly accessible)
-  - Resource limits: 0.5 vCPU, 1Gi memory (smallest paid tier)
+  - Resource limits: 0.5 vCPU, 1Gi memory; scales between zero and one replica
 
 Provisioning typically takes 2-3 minutes.
 
@@ -217,13 +217,20 @@ The Container App uses a **user-assigned managed identity** with the **Key Vault
 
 ## Resource Cost
 
-The deployment uses:
-- **Container Apps**: 0.5 vCPU + 1Gi memory (smallest paid tier) — ~$10-15/month
-- **Key Vault**: Standard tier — ~$0.60/month + access charges
-- **Log Analytics**: Pay-per-GB ingestion — typically <$1/month for low-traffic app
-- **Storage**: Small Blob storage cost for cached JSON data
+The deployment uses Consumption billing rather than a fixed hosting fee:
+- **Container Apps**: 0.5 vCPU + 1Gi memory, with zero to one replica. No compute is
+  charged while scaled to zero; running replicas are billed for allocated resources.
+  The smallest supported allocation is 0.25 vCPU + 0.5Gi, but this deployment does not
+  change to that size automatically.
+- **Key Vault**: Standard-tier operation charges.
+- **Log Analytics**: Usage-based ingestion and retention.
+- **Storage**: Stored data, transactions, and applicable transfer charges.
 
-Total estimated cost: **~$15-20/month**
+Actual costs depend on traffic, replica running time, and subscription-wide free
+allowances. See [Container Apps billing](https://learn.microsoft.com/azure/container-apps/billing)
+and the [README](README.md#azure-infrastructure) for a historical production cost
+observation. In-memory snapshots reduce repeated storage work, but do not eliminate
+platform cold starts or change the configured replica count.
 
 ## Troubleshooting
 

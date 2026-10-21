@@ -17,13 +17,11 @@ import (
 	"go.opentelemetry.io/otel/codes"
 
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/settings"
-	"github.com/jetzlstorfer/wattpilot-exporter/internal/storage"
 )
 
 var tracer = otel.Tracer("github.com/jetzlstorfer/wattpilot-exporter/internal/forecast")
 
 const (
-	cacheFileName         = "forecast/open-meteo.json"
 	openMeteoBaseURL      = "https://api.open-meteo.com/v1/forecast"
 	forecastTimeout       = 6 * time.Second
 	recommendedWindowSize = 3
@@ -215,35 +213,6 @@ func buildDashboardForecast(now time.Time, payload []byte, lastUpdated time.Time
 	return forecast, nil
 }
 
-func loadForecastPayload(ctx context.Context, lat float64, lon float64) ([]byte, time.Time, error) {
-	cachePath := cacheFilePath()
-	modTime, modErr := storage.Store().ModTime(ctx, cachePath)
-	cacheFresh := modErr == nil && time.Since(modTime) <= time.Duration(settings.GetForecastTTLMinutes())*time.Minute
-	if cacheFresh {
-		payload, err := storage.Store().Read(ctx, cachePath)
-		if err == nil {
-			return payload, modTime, nil
-		}
-	}
-
-	payload, err := fetchForecast(ctx, lat, lon)
-	if err == nil {
-		if writeErr := storage.Store().Write(ctx, cachePath, payload); writeErr != nil {
-			slog.WarnContext(ctx, "forecast: failed to cache payload", "error", writeErr)
-		}
-		return payload, time.Now(), nil
-	}
-
-	if modErr == nil {
-		cachedPayload, readErr := storage.Store().Read(ctx, cachePath)
-		if readErr == nil {
-			return cachedPayload, modTime, nil
-		}
-	}
-
-	return nil, time.Time{}, err
-}
-
 func fetchForecast(ctx context.Context, lat float64, lon float64) ([]byte, error) {
 	ctx, span := tracer.Start(ctx, "fetchForecast")
 	defer span.End()
@@ -290,15 +259,18 @@ func fetchForecast(ctx context.Context, lat float64, lon float64) ([]byte, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to store forecast response: %w", err)
 	}
+	if err := validateForecastPayload(encoded); err != nil {
+		return nil, err
+	}
 	return encoded, nil
 }
 
-func cacheFilePath() string {
+func cacheFilePath(lat, lon float64) string {
 	root := strings.TrimSpace(os.Getenv("WATTPILOT_DATA_DIR"))
 	if root == "" {
 		root = "data"
 	}
-	return filepath.Join(root, cacheFileName)
+	return filepath.Join(root, "forecast", fmt.Sprintf("open-meteo-%.5f-%.5f.json", lat, lon))
 }
 
 func calculatePVEstimateKwh(shortwaveRadiation float64, peakKW float64, performanceFactor float64) float64 {

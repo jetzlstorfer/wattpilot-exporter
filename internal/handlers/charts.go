@@ -38,6 +38,7 @@ func ChartHandler(templateDir string) http.HandlerFunc {
 
 		// get data from wattpilot
 		data, err := wattpilot.GetStatsForMonths(ctx, months)
+		setDataCacheHeaders(w)
 		if err != nil {
 			// Log the error but still render the page with a message
 			slog.ErrorContext(ctx, "chartHandler: failed to get stats", "error", err)

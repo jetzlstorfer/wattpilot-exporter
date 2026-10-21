@@ -13,9 +13,11 @@ import (
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
+	"github.com/jetzlstorfer/wattpilot-exporter/internal/forecast"
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/handlers"
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/settings"
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/storage"
+	"github.com/jetzlstorfer/wattpilot-exporter/internal/wattpilot"
 	"github.com/joho/godotenv"
 )
 
@@ -55,6 +57,8 @@ func main() {
 
 	// Load settings from Azure Blob Storage (falls back to defaults)
 	settings.Load(ctx)
+	wattpilot.InitCache(ctx)
+	forecast.InitCache(ctx)
 
 	templateDir := "templates"
 	staticDir := "static"
