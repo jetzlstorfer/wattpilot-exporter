@@ -18,7 +18,8 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 - **Entra ID authentication** — Azure Easy Auth restricts access to your Azure AD tenant
 - **Custom domain support** — CNAME + managed TLS certificate configured in Bicep
 - **Live charging indicator** — dashboard status banner on the current month view that appears when charging seems active based on recent session updates
-- **Data caching and backup fallback** — data is cached in local filesystem storage or Azure Blob Storage; monthly backups are stored as `data/*_backup.json`; use the `/refresh` endpoint to re-fetch
+- **Cached-page-first loading** — process-local charging snapshots and forecasts avoid repeated storage reads; stale data remains available while one background refresh runs
+- **Data caching and backup fallback** — local filesystem or Azure Blob Storage provides persistence; monthly backups are stored as `data/*_backup.json`; use `/refresh` to force a refresh
 - **OpenTelemetry observability** — automatic HTTP request traces, app-level spans, and structured logs
 - **Docker support** — multi-stage Docker build for minimal container images
 
@@ -39,7 +40,7 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | No | OTLP/HTTP collector endpoint (for example `http://localhost:4318`) |
 | `AZURE_STORAGE_ACCOUNT_NAME` | No | Enables Azure Blob Storage backend when set |
 | `AZURE_STORAGE_CONTAINER_NAME` | No | Blob container name (defaults to `wattpilot-data`) |
-| `AZURE_STORAGE_ENDPOINT` | No | Azure Blob Storage endpoint for settings persistence (set automatically by Bicep) |
+| `WATTPILOT_DATA_DIR` | No | Charging data and forecast cache directory (defaults to `data`; settings remain in `data/config.json`) |
 
 You can find the key on your Wattpilot export page — it is the `e=` query parameter in the URL:
 
@@ -67,7 +68,52 @@ The app includes built-in **OpenTelemetry tracing and logging**:
 Exporter behavior:
 
 - If `OTEL_EXPORTER_OTLP_ENDPOINT` is set, traces and logs are sent via **OTLP/HTTP** to your collector.
-- If it is not set, telemetry is written to stdout, which is convenient for local development and debugging.
+- If it is not set, structured logs are written to stdout; trace sampling and export are disabled.
+
+## Caching and refresh behavior
+
+Blob Storage (or the local filesystem) remains the durable source of cached data. Each
+server process lazily loads a validated charging snapshot and indexes its sessions by
+month. Charts load the full dataset once, rather than downloading and parsing it for
+each month. Subsequent dashboard, chart, and Excel requests reuse the snapshot without
+storage reads. Prices and network fees are still calculated from current settings,
+so saving settings takes effect without refreshing charging data.
+
+- **Freshness:** the Settings page controls the charging data TTL (default 30 minutes)
+  and forecast TTL (default 120 minutes). These control when requests trigger refreshes;
+  they are not background polling schedules.
+- **Stale-while-revalidate:** requests return valid cached data immediately, even when
+  it is stale. The first such request starts one background refresh; concurrent requests
+  share that work instead of queueing duplicate API calls.
+- **Cold cache:** a new process reads persisted data first. Missing or corrupt charging
+  data falls back to validated monthly backups. Only when no usable snapshot or required
+  backup exists does the request wait for a fetch. Forecasts follow the same cached-first
+  policy, with separate persisted files for each coordinate pair so location changes
+  cannot reuse another location's forecast.
+- **Failure safety:** failed fetches, invalid payloads, and failed main-cache writes
+  preserve the previous in-memory and persisted snapshot. Automatic retries back off
+  for one minute after failure. Errors are logged; stale data remains available.
+  `/refresh` waits for a charging refresh, joins an in-flight refresh if present, and
+  bypasses failure backoff. A successful refresh updates storage and the in-memory
+  snapshot; monthly backups remain best-effort.
+- **Lifetime:** shared storage reads and charging refreshes have a 30-second overall
+  deadline, with a five-second Wattpilot API timeout. Forecast cache operations have a
+  15-second deadline and a six-second API timeout. A cancelled browser request does not
+  cancel shared work, but server shutdown does.
+
+Dashboard, charts, and Excel responses expose the last loaded main charging snapshot's
+timestamp in `X-Wattpilot-Data-Updated-At` when available. The
+`X-Wattpilot-Refresh-Status` header reports `idle`, `refreshing`, or `failed`; upstream
+error details are not included in response headers.
+
+The caches are process-local: a restart hydrates them from persistent storage, and
+out-of-process file/blob edits require a restart to be loaded reliably. Keep one
+replica until cross-replica refresh coordination and settings invalidation are added.
+Background refresh is best-effort on scale-to-zero hosting, not a durable scheduled
+job or a freshness guarantee. This optimization does not change Azure replica counts,
+resource allocation, or eliminate platform cold starts. Coordinate-specific forecast
+files replace the old unkeyed `forecast/open-meteo.json` cache; the first request for
+a location may need to fetch a new forecast.
 
 Example local collector setup:
 
@@ -89,8 +135,8 @@ go run ./cmd/server
 Or use the Makefile:
 
 ```bash
-make run        # fetches fresh data (deletes cached data/data.json first)
-make run-cached # uses cached data/data.json if available
+make run        # uses cached data when available
+make run-clean  # deletes cached data/data.json before starting
 ```
 
 The application starts on **http://localhost:8080**.
@@ -274,11 +320,17 @@ The Bicep infrastructure provisions the following resources:
 | Azure Key Vault | Stores `WATTPILOT_KEY` securely | `infra/modules/key-vault.bicep` |
 | Container Apps Environment | Managed hosting | `infra/modules/container-apps-env.bicep` |
 | Container App | Runs the Go application | `infra/modules/container-app.bicep` |
-| Storage Account | Persists app settings (JSON) | `infra/modules/blob-storage.bicep` |
+| Storage Account | Persists charging data, monthly backups, forecasts, and settings | `infra/modules/storage-account.bicep` |
+| Legacy settings storage account | Provisioned separately; the current application uses the main data store for settings | `infra/modules/blob-storage.bicep` |
 | RBAC Assignments | Managed identity access to Key Vault + Storage | `infra/modules/key-vault-access.bicep`, `infra/modules/blob-storage-access.bicep` |
 | Easy Auth (optional) | Entra ID login | `infra/modules/container-app.bicep` (authConfigs) |
 
-Estimated monthly cost: **~$15-20/month**
+Container Apps is configured for **0.5 vCPU / 1 GiB**, with **0–1 replicas**.
+Compute scales to zero when idle; actual cost depends on running time, allocated
+resources, logging, and subscription-wide free allowances. Do not treat this as a
+fixed monthly hosting fee. One read-only production assessment for September
+21–October 21, 2026 reported approximately **€1.30 pretax** for the resource group;
+this is a historical observation, not a forecast or price guarantee.
 
 ## Tech Stack
 
@@ -312,7 +364,10 @@ wattpilot-exporter/
 │   │   └── settings_test.go
 │   ├── storage/
 │   │   └── storage.go        # Shared storage abstraction (local + Azure Blob)
+│   ├── snapshot/
+│   │   └── snapshot.go       # Shared snapshot loading, refresh deduplication, and backoff
 │   └── wattpilot/
+│       ├── cache.go         # Indexed process-local charging snapshots and backup fallback
 │       ├── wattpilot.go     # API client, caching, pricing logic
 │       └── wattpilot_test.go
 ├── templates/               # Server-side HTML templates
@@ -329,8 +384,8 @@ wattpilot-exporter/
 | Target | Description |
 |---|---|
 | `make build` | Compile the binary |
-| `make run` | Delete cached data and run the app |
-| `make run-cached` | Run the app using cached data |
+| `make run` | Run the app using cached data when available |
+| `make run-clean` | Delete cached charging data and run the app |
 | `make sample-init` | Copy local cache/backups into `data/sample/` for sample mode |
 | `make sample` | Run the app with sample data (no API key required) |
 | `make clean` | Remove binary and cached data |

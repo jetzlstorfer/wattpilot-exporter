@@ -179,6 +179,7 @@ func DashboardHandler(templateDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		date := r.URL.Query().Get("date")
 		data, err := calculateData(r.Context(), date)
+		setDataCacheHeaders(w)
 		if err != nil {
 			slog.ErrorContext(r.Context(), "mainHandler: error calculating data", "error", err)
 		}
