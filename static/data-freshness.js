@@ -1,11 +1,10 @@
 (function () {
-    const status = document.getElementById('data-freshness');
-    if (!status) return;
+    const snapshot = document.getElementById('data-freshness');
+    if (!snapshot) return;
 
     // Compare against the snapshot actually rendered, not a later status read:
     // a background refresh can finish while the server is rendering the page.
-    const renderedAt = status.dataset.updatedAt;
-    const lastUpdated = renderedAt ? `Last updated: ${new Date(renderedAt).toLocaleString()}. ` : '';
+    const renderedAt = snapshot.dataset.updatedAt;
     let timer;
     let checking = false;
 
@@ -29,18 +28,12 @@
             }
             const state = response.headers.get('X-Wattpilot-Refresh-Status');
             if (state === 'refreshing') {
-                status.textContent = `${lastUpdated}Refreshing charging data...`;
                 delay = 1000;
             } else if (state === 'failed') {
-                status.textContent = renderedAt
-                    ? `${lastUpdated}Refresh failed. Showing cached data; will retry automatically.`
-                    : 'Refresh failed. Will retry automatically.';
-            } else {
-                status.textContent = `${lastUpdated}Automatic freshness checks enabled.`;
+                console.warn('Charging data refresh failed; keeping cached data and retrying automatically.');
             }
         } catch (error) {
             console.warn('Unable to check charging data freshness', error);
-            status.textContent = `${lastUpdated}Unable to check for updates; will retry automatically.`;
         } finally {
             checking = false;
             timer = setTimeout(check, delay);
