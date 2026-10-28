@@ -217,6 +217,9 @@ func TestStaleDataAndBackupsReturnDuringRefresh(t *testing.T) {
 			if err != nil || got.Data[0].Energy != 1 {
 				t.Fatalf("initial stale data = %+v, %v", got, err)
 			}
+			if !got.UpdatedAt.Equal(store.modified) {
+				t.Fatalf("rendered snapshot timestamp = %v, want %v", got.UpdatedAt, store.modified)
+			}
 			await(t, started)
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
@@ -234,11 +237,75 @@ func TestStaleDataAndBackupsReturnDuringRefresh(t *testing.T) {
 			if err != nil || got.Data[0].Energy != 9 || calls.Load() != 1 {
 				t.Fatalf("refreshed data = %+v, %v, calls=%d", got, err, calls.Load())
 			}
+			if !got.UpdatedAt.Equal(cache.main.Status().UpdatedAt) || !got.UpdatedAt.After(store.modified) {
+				t.Fatal("refreshed data does not identify its new snapshot")
+			}
 			store.mu.Lock()
 			if string(store.files[dataFilePath(JSONFileName)]) != refreshedJSON {
 				t.Error("refresh was not persisted")
 			}
 			store.mu.Unlock()
+		})
+	}
+}
+
+func TestFreshnessChecksRespectTTL(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		age     time.Duration
+		key     bool
+		refresh bool
+	}{
+		{"within TTL", dataTTL() - time.Second, true, false},
+		{"past TTL", dataTTL() + time.Second, true, true},
+		{"offline cache", dataTTL() + time.Second, false, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := testStore()
+			store.modified = time.Now().Add(-test.age)
+			cache := useDataCache(t, store)
+			started, release := make(chan struct{}), make(chan struct{})
+			var calls atomic.Int32
+			if test.key {
+				useAPI(t, func(r *http.Request) (*http.Response, error) {
+					calls.Add(1)
+					close(started)
+					select {
+					case <-release:
+						return response(refreshedJSON), nil
+					case <-r.Context().Done():
+						return nil, r.Context().Err()
+					}
+				})
+			}
+			// Status checks alone must hydrate a cold process and refresh an open
+			// page, without requiring another dashboard request.
+			for range 10 {
+				ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+				status := CheckDataFreshness(ctx)
+				cancel()
+				if status.Err != nil || status.Refreshing != test.refresh || !status.UpdatedAt.Equal(store.modified) {
+					t.Fatalf("freshness status = %+v", status)
+				}
+			}
+			if test.refresh {
+				await(t, started)
+				close(release)
+				if _, err := cache.main.RefreshIfStale(context.Background(), dataTTL()); err != nil {
+					t.Fatal(err)
+				}
+				status := CheckDataFreshness(context.Background())
+				if status.Refreshing || status.Err != nil || !status.UpdatedAt.After(store.modified) || calls.Load() != 1 {
+					t.Fatalf("completed refresh status=%+v, calls=%d", status, calls.Load())
+				}
+			} else if calls.Load() != 0 {
+				t.Fatal("freshness check fetched before the TTL or without a key")
+			}
+			store.mu.Lock()
+			defer store.mu.Unlock()
+			if store.reads[dataFilePath(JSONFileName)] != 1 || store.stats != 1 {
+				t.Fatalf("status checks repeated storage reads: reads=%v, stats=%d", store.reads, store.stats)
+			}
 		})
 	}
 }
@@ -311,6 +378,9 @@ func TestRefreshFailuresPreserveSnapshotsAndBackOff(t *testing.T) {
 				t.Fatal("refresh should fail")
 			}
 			for range 10 {
+				if status := CheckDataFreshness(context.Background()); status.Err == nil || status.Refreshing {
+					t.Fatalf("status checks bypassed refresh failure backoff: %+v", status)
+				}
 				got, err := GetStatsForMonth(context.Background(), "2024-06")
 				if err != nil || got.Data[0].Energy != 1 {
 					t.Fatalf("failed refresh replaced snapshot: %+v, %v", got, err)

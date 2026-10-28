@@ -69,6 +69,7 @@ func main() {
 	mux.HandleFunc("/favicon.svg", handlers.FaviconSVGHandler(staticDir))
 	mux.HandleFunc("/", handlers.DashboardHandler(templateDir))
 	mux.HandleFunc("/refresh", handlers.RefreshHandler)
+	mux.HandleFunc("GET /data-status", handlers.DataStatusHandler)
 	mux.HandleFunc("/charts", handlers.ChartHandler(templateDir))
 	mux.HandleFunc("/info", handlers.InfoHandler(templateDir))
 	mux.HandleFunc("/settings", handlers.SettingsHandler(templateDir))

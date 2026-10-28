@@ -67,8 +67,9 @@ type WattpilotColumn struct {
 }
 
 type WattpilotData struct {
-	Columns []WattpilotColumn `json:"columns"`
-	Data    []WattpilotEntry  `json:"data"`
+	Columns   []WattpilotColumn `json:"columns"`
+	Data      []WattpilotEntry  `json:"data"`
+	UpdatedAt time.Time         `json:"-"`
 }
 
 type WattpilotEntry struct {

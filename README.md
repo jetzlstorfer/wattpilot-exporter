@@ -84,7 +84,13 @@ so saving settings takes effect without refreshing charging data.
   they are not background polling schedules.
 - **Stale-while-revalidate:** requests return valid cached data immediately, even when
   it is stale. The first such request starts one background refresh; concurrent requests
-  share that work instead of queueing duplicate API calls.
+  share that work instead of queueing duplicate API calls. Dashboard and charts pages
+  check `/data-status` every 30 seconds while visible (every second during a refresh)
+  and reload automatically when a newer snapshot is available, preserving the URL and
+  selected month. Returning to a tab checks immediately. These checks also trigger
+  TTL-based refreshes for pages left open; they do not force a fetch before the TTL.
+  The page shows the last update time and reports refresh/check failures while keeping
+  cached data visible. This requires JavaScript; without it, reload the page to see updates.
 - **Cold cache:** a new process reads persisted data first. Missing or corrupt charging
   data falls back to validated monthly backups. Only when no usable snapshot or required
   backup exists does the request wait for a fetch. Forecasts follow the same cached-first
@@ -101,10 +107,17 @@ so saving settings takes effect without refreshing charging data.
   15-second deadline and a six-second API timeout. A cancelled browser request does not
   cancel shared work, but server shutdown does.
 
-Dashboard, charts, and Excel responses expose the last loaded main charging snapshot's
+Run cache/handler regressions with `go test -race ./...`. The browser freshness
+script has dependency-free tests: `node --test tests/data-freshness.test.cjs`
+(Node.js 18+; Node is not needed to run the application).
+
+Dashboard, charts, and Excel responses expose the rendered charging snapshot's
 timestamp in `X-Wattpilot-Data-Updated-At` when available. The
 `X-Wattpilot-Refresh-Status` header reports `idle`, `refreshing`, or `failed`; upstream
 error details are not included in response headers.
+Data responses and freshness checks use `Cache-Control: no-store` so browser/proxy
+caching cannot bypass the server's age check. Page timestamps identify the snapshot
+actually rendered, even if a background refresh finishes during rendering.
 
 The caches are process-local: a restart hydrates them from persistent storage, and
 out-of-process file/blob edits require a restart to be loaded reliably. Keep one

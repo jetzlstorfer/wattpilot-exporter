@@ -21,7 +21,8 @@ type MonthStat struct {
 
 // ChartsData is the template context for the charts page.
 type ChartsData struct {
-	Months []MonthStat
+	DataUpdatedAt string
+	Months        []MonthStat
 }
 
 // ChartHandler handles GET /charts.
@@ -38,7 +39,11 @@ func ChartHandler(templateDir string) http.HandlerFunc {
 
 		// get data from wattpilot
 		data, err := wattpilot.GetStatsForMonths(ctx, months)
-		setDataCacheHeaders(w)
+		updatedAt := ""
+		if len(data) > 0 {
+			updatedAt = snapshotTimestamp(data[0].UpdatedAt)
+		}
+		setDataCacheHeaders(w, updatedAt)
 		if err != nil {
 			// Log the error but still render the page with a message
 			slog.ErrorContext(ctx, "chartHandler: failed to get stats", "error", err)
@@ -85,7 +90,7 @@ func ChartHandler(templateDir string) http.HandlerFunc {
 			slog.ErrorContext(ctx, "chartHandler: template parse error", "error", err)
 			return
 		}
-		if err := tmpl.Execute(w, ChartsData{Months: monthStats}); err != nil {
+		if err := tmpl.Execute(w, ChartsData{DataUpdatedAt: updatedAt, Months: monthStats}); err != nil {
 			slog.ErrorContext(ctx, "chartHandler: template execute error", "error", err)
 		}
 	}
