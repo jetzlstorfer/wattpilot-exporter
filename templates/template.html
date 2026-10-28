@@ -6,6 +6,7 @@
     <meta name="color-scheme" content="light dark">
     <title>Wattpilot Dashboard</title>
     <script src="/static/chart.min.js"></script>
+    <script src="/static/data-freshness.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -59,6 +60,9 @@
             <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-1">Monthly Overview</p>
                 <h1 class="text-4xl font-extrabold text-white tracking-tight">{{ .FormattedDate }}</h1>
+                {{ if .CheckFreshness }}
+                <p id="data-freshness" data-updated-at="{{ .DataUpdatedAt }}" class="text-sm text-gray-400 mt-2" role="status" aria-live="polite">Checking data freshness...</p>
+                {{ end }}
             </div>
             <div class="flex items-center gap-2">
                 {{ if .PrevMonth }}
