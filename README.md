@@ -89,8 +89,9 @@ so saving settings takes effect without refreshing charging data.
   and reload automatically when a newer snapshot is available, preserving the URL and
   selected month. Returning to a tab checks immediately. These checks also trigger
   TTL-based refreshes for pages left open; they do not force a fetch before the TTL.
-  The page shows the last update time and reports refresh/check failures while keeping
-  cached data visible. This requires JavaScript; without it, reload the page to see updates.
+  Refresh checks do not add visible status UI; failures are reported in the browser
+  console while cached data stays visible and checks continue. This requires JavaScript;
+  without it, reload the page to see updates.
 - **Cold cache:** a new process reads persisted data first. Missing or corrupt charging
   data falls back to validated monthly backups. Only when no usable snapshot or required
   backup exists does the request wait for a fetch. Forecasts follow the same cached-first

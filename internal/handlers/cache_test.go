@@ -156,9 +156,13 @@ func TestDataRoutesReuseSnapshotAndExposeFreshness(t *testing.T) {
 				t.Fatal("cached charging energy is missing from page")
 			}
 			if test.name == "dashboard" || test.name == "charts" {
-				if !strings.Contains(recorder.Body.String(), `data-updated-at="`+recorder.Header().Get("X-Wattpilot-Data-Updated-At")+`"`) ||
+				if !strings.Contains(recorder.Body.String(), `<meta id="data-freshness" data-updated-at="`+recorder.Header().Get("X-Wattpilot-Data-Updated-At")+`">`) ||
 					!strings.Contains(recorder.Body.String(), `/static/data-freshness.js`) {
 					t.Fatal("page does not track the rendered snapshot for automatic updates")
+				}
+				if strings.Contains(recorder.Body.String(), `role="status"`) ||
+					strings.Contains(recorder.Body.String(), "Checking data freshness...") {
+					t.Fatal("automatic updates must not add visible freshness status UI")
 				}
 			}
 			if test.name == "dashboard" {
