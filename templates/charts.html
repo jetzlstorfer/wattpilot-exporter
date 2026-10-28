@@ -81,7 +81,7 @@
         <!-- Summary table -->
         <div class="card rounded-2xl p-6">
             <h2 class="text-lg font-bold text-white mb-1">Monthly Breakdown</h2>
-            <p class="text-sm text-gray-500 mb-6">Click a column header to sort</p>
+            <p class="text-sm text-gray-500 mb-6">Newest month first by default. Click a column header to sort.</p>
             <div class="overflow-x-auto">
                 <table id="monthlyBreakdownTable" class="w-full text-sm">
                     <thead>
@@ -233,13 +233,39 @@
         if (!table) return;
         const tbody = table.querySelector('tbody');
         const headers = table.querySelectorAll('th.sortable-header');
-        let sortCol = -1;
-        let sortAsc = true;
+        let sortCol = 0;
+        let sortAsc = false;
 
         function cellValue(row, col) {
             const text = row.cells[col].textContent.trim();
+            // YYYY-MM strings sort chronologically without losing the month.
+            if (col === 0) return text;
             const num = parseFloat(text.replace(/,/g, '.'));
             return isNaN(num) ? text.toLowerCase() : num;
+        }
+
+        function sortTable() {
+            headers.forEach(function(th) {
+                const active = parseInt(th.getAttribute('data-col'), 10) === sortCol;
+                th.setAttribute('aria-sort', active ? (sortAsc ? 'ascending' : 'descending') : 'none');
+                th.classList.toggle('text-white', active);
+                th.classList.toggle('text-gray-500', !active);
+                const icon = th.querySelector('.sort-icon');
+                if (icon) {
+                    icon.textContent = active ? (sortAsc ? '↑' : '↓') : '⇅';
+                    icon.classList.toggle('opacity-50', !active);
+                }
+            });
+
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            rows.sort(function(a, b) {
+                const av = cellValue(a, sortCol);
+                const bv = cellValue(b, sortCol);
+                if (av < bv) return sortAsc ? -1 : 1;
+                if (av > bv) return sortAsc ? 1 : -1;
+                return 0;
+            });
+            rows.forEach(function(row) { tbody.appendChild(row); });
         }
 
         headers.forEach(function(th) {
@@ -252,33 +278,10 @@
                     sortAsc = true;
                 }
 
-                headers.forEach(function(h) {
-                    const icon = h.querySelector('.sort-icon');
-                    if (!icon) return;
-                    h.classList.remove('text-white');
-                    h.classList.add('text-gray-500');
-                    icon.textContent = '⇅';
-                    icon.classList.add('opacity-50');
-                });
-                const activeIcon = th.querySelector('.sort-icon');
-                th.classList.remove('text-gray-500');
-                th.classList.add('text-white');
-                if (activeIcon) {
-                    activeIcon.textContent = sortAsc ? '↑' : '↓';
-                    activeIcon.classList.remove('opacity-50');
-                }
-
-                const rows = Array.from(tbody.querySelectorAll('tr'));
-                rows.sort(function(a, b) {
-                    const av = cellValue(a, col);
-                    const bv = cellValue(b, col);
-                    if (av < bv) return sortAsc ? -1 : 1;
-                    if (av > bv) return sortAsc ? 1 : -1;
-                    return 0;
-                });
-                rows.forEach(function(row) { tbody.appendChild(row); });
+                sortTable();
             });
         });
+        sortTable();
     })();
     </script>
 
