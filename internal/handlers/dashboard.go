@@ -31,6 +31,8 @@ type SessionPoint struct {
 
 // DashboardData is the template context for the main dashboard page.
 type DashboardData struct {
+	CheckFreshness   bool
+	DataUpdatedAt    string
 	Date             string
 	FormattedDate    string
 	PrevMonth        string
@@ -110,11 +112,12 @@ func calculateData(ctx context.Context, date string) (DashboardData, error) {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return DashboardData{
-			Date:          monthToCalculate,
-			FormattedDate: formattedDate,
-			PrevMonth:     wattpilot.GetPrevMonth(monthToCalculate),
-			NextMonth:     wattpilot.GetNextMonth(monthToCalculate),
-			Error:         "Unable to fetch charging data. Please try refreshing or check back later.",
+			CheckFreshness: true,
+			Date:           monthToCalculate,
+			FormattedDate:  formattedDate,
+			PrevMonth:      wattpilot.GetPrevMonth(monthToCalculate),
+			NextMonth:      wattpilot.GetNextMonth(monthToCalculate),
+			Error:          "Unable to fetch charging data. Please try refreshing or check back later.",
 		}, nil
 	}
 
@@ -158,6 +161,8 @@ func calculateData(ctx context.Context, date string) (DashboardData, error) {
 	}
 
 	return DashboardData{
+		CheckFreshness:   true,
+		DataUpdatedAt:    snapshotTimestamp(parsedData.UpdatedAt),
 		Date:             monthToCalculate,
 		FormattedDate:    formattedDate,
 		PrevMonth:        wattpilot.GetPrevMonth(monthToCalculate),
@@ -179,7 +184,7 @@ func DashboardHandler(templateDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		date := r.URL.Query().Get("date")
 		data, err := calculateData(r.Context(), date)
-		setDataCacheHeaders(w)
+		setDataCacheHeaders(w, data.DataUpdatedAt)
 		if err != nil {
 			slog.ErrorContext(r.Context(), "mainHandler: error calculating data", "error", err)
 		}

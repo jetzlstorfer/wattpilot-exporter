@@ -119,16 +119,30 @@ func canRefresh() bool {
 	return os.Getenv("WATTPILOT_KEY") != ""
 }
 
-func monthlyData(data indexedData, month string) WattpilotData {
+func monthlyData(value snapshot.Value[indexedData], month string) WattpilotData {
 	return WattpilotData{
-		Columns: slices.Clone(data.data.Columns),
-		Data:    slices.Clone(data.months[month]),
+		Columns:   slices.Clone(value.Data.data.Columns),
+		Data:      slices.Clone(value.Data.months[month]),
+		UpdatedAt: value.UpdatedAt,
 	}
 }
 
 // DataCacheStatus reports process-local charging data freshness without reading storage.
 func DataCacheStatus() snapshot.Status {
 	return activeCache().main.Status()
+}
+
+// CheckDataFreshness hydrates the cache if needed and starts a background refresh
+// using the same TTL, coalescing, and failure backoff as data requests.
+func CheckDataFreshness(ctx context.Context) snapshot.Status {
+	cache := activeCache()
+	if _, err := cache.main.Get(ctx); err != nil && ctx.Err() != nil {
+		return cache.main.Status()
+	}
+	if canRefresh() {
+		cache.main.Revalidate(dataTTL())
+	}
+	return cache.main.Status()
 }
 
 func statsForMonths(ctx context.Context, months []string) ([]WattpilotData, error) {
@@ -145,7 +159,7 @@ func statsForMonths(ctx context.Context, months []string) ([]WattpilotData, erro
 		}
 		result := make([]WattpilotData, 0, len(months))
 		for _, month := range months {
-			result = append(result, monthlyData(main.Data, month))
+			result = append(result, monthlyData(main, month))
 		}
 		return result, nil
 	}
@@ -162,7 +176,7 @@ func statsForMonths(ctx context.Context, months []string) ([]WattpilotData, erro
 				if refreshErr == nil {
 					result = result[:0]
 					for _, requested := range months {
-						result = append(result, monthlyData(refreshed.Data, requested))
+						result = append(result, monthlyData(refreshed, requested))
 					}
 					return result, nil
 				}
@@ -170,7 +184,7 @@ func statsForMonths(ctx context.Context, months []string) ([]WattpilotData, erro
 			}
 			return result, fmt.Errorf("charging data unavailable: main=%v, backup=%w", mainErr, backupErr)
 		}
-		result = append(result, monthlyData(backup.Data, month))
+		result = append(result, monthlyData(backup, month))
 	}
 	if canRefresh() {
 		cache.main.Revalidate(dataTTL())
