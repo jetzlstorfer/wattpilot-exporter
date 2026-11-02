@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jetzlstorfer/wattpilot-exporter/internal/wattpilot"
+	"github.com/xuri/excelize/v2"
 )
 
 type statusTransport func(*http.Request) (*http.Response, error)
@@ -151,6 +153,33 @@ func TestDataRoutesReuseSnapshotAndExposeFreshness(t *testing.T) {
 			} else if test.name == "download" {
 				if !strings.HasPrefix(recorder.Body.String(), "PK") {
 					t.Fatal("download is not an XLSX archive")
+				}
+				workbook, err := excelize.OpenReader(bytes.NewReader(recorder.Body.Bytes()))
+				if err != nil {
+					t.Fatalf("open downloaded workbook: %v", err)
+				}
+				t.Cleanup(func() {
+					if err := workbook.Close(); err != nil {
+						t.Errorf("close downloaded workbook: %v", err)
+					}
+				})
+				for _, cell := range []struct {
+					name string
+					want string
+				}{
+					{"A1", "Energy"},
+					{"A2", "12.5"},
+					{"A4", "Total kWh"},
+				} {
+					if got, err := workbook.GetCellValue("Sheet1", cell.name); err != nil || got != cell.want {
+						t.Errorf("cell %s = %q, %v; want %q", cell.name, got, err, cell.want)
+					}
+				}
+				if got, err := workbook.GetCellFormula("Sheet1", "B4"); err != nil || got != "SUM(A2:A2)" {
+					t.Errorf("energy formula = %q, %v; want SUM(A2:A2)", got, err)
+				}
+				if got, err := workbook.CalcCellValue("Sheet1", "B4"); err != nil || got != "12.5" {
+					t.Errorf("total energy = %q, %v; want 12.5", got, err)
 				}
 			} else if !strings.Contains(recorder.Body.String(), "12.5") {
 				t.Fatal("cached charging energy is missing from page")
