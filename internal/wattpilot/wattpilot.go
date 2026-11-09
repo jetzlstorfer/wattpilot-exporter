@@ -32,6 +32,7 @@ var tracer = otel.Tracer("github.com/jetzlstorfer/wattpilot-exporter/internal/wa
 const OfficialPricePerKwh2024 = 0.33182
 const OfficialPricePerKwh2025 = 0.35889 // https://www.bmf.gv.at/themen/steuern/arbeitnehmerinnenveranlagung/pendlerfoerderung-das-pendlerpauschale/sachbezug-kraftfahrzeug.html
 const OfficialPricePerKwh2026 = 0.32806
+const OfficialPricePerKwh2027 = 0.32700
 const PurchasePricePerKwh2024 = 0.2824
 const PurchasePricePerKwh2025 = 0.25
 const PurchasePricePerKwh2026 = 0.25

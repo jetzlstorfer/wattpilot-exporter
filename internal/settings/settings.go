@@ -70,6 +70,7 @@ func Defaults() Settings {
 			"2024": 0.33182,
 			"2025": 0.35889,
 			"2026": 0.32806,
+			"2027": 0.32700, // https://findok.bmf.gv.at/findok/volltext?dokumentId=a7569128-308f-4383-bba7-06eaaef412f5
 		},
 		PurchasePrices: map[string]float64{
 			"2024": 0.2824,
@@ -126,6 +127,12 @@ func Load(ctx context.Context) {
 	}
 	if s.OfficialPrices == nil {
 		s.OfficialPrices = d.OfficialPrices
+	} else {
+		for year, price := range d.OfficialPrices {
+			if _, ok := s.OfficialPrices[year]; !ok {
+				s.OfficialPrices[year] = price
+			}
+		}
 	}
 	if s.PurchasePrices == nil {
 		s.PurchasePrices = d.PurchasePrices
