@@ -322,6 +322,12 @@ Charging costs are calculated using the yearly rates published by the Austrian F
 | 2024 | 0.33182 | 0.2824 |
 | 2025 | 0.35889 | 0.25 |
 | 2026 | 0.32806 | configurable per month |
+| 2027 | 0.32700 | configurable per month |
+
+The [BMF notice for 2027](https://findok.bmf.gv.at/findok/volltext?dokumentId=a7569128-308f-4383-bba7-06eaaef412f5)
+sets the reimbursement rate at **32.700 cents/kWh (€0.32700/kWh)** from January 1 through December 31, 2027.
+New official yearly defaults are added when loading existing settings without replacing custom yearly or monthly prices.
+Purchase prices remain user-configurable; the BMF rate does not set the electricity purchase price.
 
 ## Azure Infrastructure
 

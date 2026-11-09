@@ -32,7 +32,7 @@ Go web application that fetches EV charging session data from the Fronius Wattpi
 ## Key Conventions
 
 - **Date parsing** — Wattpilot API dates use European format, parsed with Go layout `"02.01.2006 15:04:05"`. Month navigation uses `"2006-01"` format throughout.
-- **Electricity prices** — Hardcoded per year as constants in `internal/wattpilot/wattpilot.go` (e.g., `OfficialPricePerKwh2025`, `PurchasePricePerKwh2025`). When adding a new year's rate: add constants, then update the switch statements in `getSellingPriceOfYear`, `getPurchasePriceOfYear`, and `GetOfficialPricePerKwhForMonth`.
+- **Electricity prices** — Yearly defaults live in `internal/settings/settings.go`; lookups use monthly overrides, then yearly overrides, then defaults. When adding an official yearly rate, update `Defaults().OfficialPrices`, the matching constant in `internal/wattpilot/wattpilot.go`, the info page, and the README. Loading settings merges missing official yearly defaults without replacing overrides. Purchase prices are independently configurable.
 - **Data caching** — The app fetches from the API once and saves to `data/data.json`. Monthly snapshots are written to `data/data-YYYY-MM_backup.json`. Auto-refresh triggers when data is older than `DataTTLMinutes` (default 60 min, configurable via `/settings`). Hit `/refresh` to force re-fetch.
 - **Refresh safety** — Fetched payloads are parsed/validated before overwriting `data.json`. On failure, existing cached data is preserved and monthly backups remain available. Writes use atomic temp-file + rename.
 - **Historical data starts from June 2024** — `GetPrevMonth` enforces this lower bound.

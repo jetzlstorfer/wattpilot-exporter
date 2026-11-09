@@ -108,6 +108,9 @@ func TestGetOfficialPricePerKwhForMonth(t *testing.T) {
 		{"2024-12", OfficialPricePerKwh2024},
 		{"2025-06", OfficialPricePerKwh2025},
 		{"2026-03", OfficialPricePerKwh2026},
+		{"2026-12", OfficialPricePerKwh2026},
+		{"2027-01", OfficialPricePerKwh2027},
+		{"2027-12", OfficialPricePerKwh2027},
 		{"2099-01", OfficialPricePerKwh2025}, // unknown year defaults to 2025
 	}
 	for _, tt := range tests {
@@ -128,6 +131,9 @@ func TestCalculatePrice(t *testing.T) {
 		{"15.06.2024 10:00:00", 10.0, 100, 10.0 * OfficialPricePerKwh2024},
 		{"15.01.2025 10:00:00", 5.0, 50, 5.0 * OfficialPricePerKwh2025},
 		{"15.03.2026 10:00:00", 20.0, 0, 20.0 * OfficialPricePerKwh2026},
+		{"31.12.2026 23:59:59", 10.0, 0, 10.0 * OfficialPricePerKwh2026},
+		{"01.01.2027 00:00:00", 10.0, 0, 3.27},
+		{"31.12.2027 23:59:59", 20.0, 100, 6.54},
 	}
 	for _, tt := range tests {
 		got := CalculatePrice(tt.endTime, tt.energy, tt.eco)
@@ -150,6 +156,23 @@ func TestCalculatePriceMargin(t *testing.T) {
 	want = 10.0 * (OfficialPricePerKwh2024 - PurchasePricePerKwh2024)
 	if RoundFloat(got, 5) != RoundFloat(want, 5) {
 		t.Errorf("CalculatePriceMargin(eco=50) = %v, want %v", got, want)
+	}
+}
+
+func TestCalculatePriceMargin2027(t *testing.T) {
+	tests := []struct {
+		eco  float64
+		want float64
+	}{
+		{100, 3.27},
+		{50, 0.77},
+		{0, 0.77},
+	}
+	for _, tt := range tests {
+		got := CalculatePriceMargin("15.06.2027 10:00:00", 10, tt.eco)
+		if RoundFloat(got, 5) != tt.want {
+			t.Errorf("CalculatePriceMargin(2027, eco=%v) = %v, want %v", tt.eco, got, tt.want)
+		}
 	}
 }
 
