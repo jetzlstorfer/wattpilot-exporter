@@ -14,6 +14,13 @@ func snapshotTimestamp(updatedAt time.Time) string {
 	return updatedAt.UTC().Format(time.RFC3339Nano)
 }
 
+func snapshotLabel(updatedAt time.Time) string {
+	if updatedAt.IsZero() {
+		return ""
+	}
+	return updatedAt.UTC().Format("02 Jan 2006, 15:04 UTC")
+}
+
 func setDataCacheHeaders(w http.ResponseWriter, updatedAt string) {
 	status := wattpilot.DataCacheStatus()
 	w.Header().Set("Cache-Control", "no-store")

@@ -33,6 +33,8 @@ type SessionPoint struct {
 type DashboardData struct {
 	CheckFreshness   bool
 	DataUpdatedAt    string
+	DataUpdatedLabel string
+	DataFallback     bool
 	Date             string
 	FormattedDate    string
 	PrevMonth        string
@@ -163,6 +165,8 @@ func calculateData(ctx context.Context, date string) (DashboardData, error) {
 	return DashboardData{
 		CheckFreshness:   true,
 		DataUpdatedAt:    snapshotTimestamp(parsedData.UpdatedAt),
+		DataUpdatedLabel: snapshotLabel(parsedData.UpdatedAt),
+		DataFallback:     wattpilot.DataCacheStatus().Err != nil,
 		Date:             monthToCalculate,
 		FormattedDate:    formattedDate,
 		PrevMonth:        wattpilot.GetPrevMonth(monthToCalculate),

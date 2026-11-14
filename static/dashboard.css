@@ -1,4 +1,13 @@
 body { font-family: 'Inter', sans-serif; }
+.data-fallback-warning {
+    margin-bottom: 2rem;
+    padding: 1rem 1.5rem;
+    border: 1px solid #d97706;
+    border-radius: 1rem;
+    background: #fffbeb;
+    color: #78350f;
+}
+.data-fallback-warning[hidden] { display: none; }
 .card {
     background: rgba(17,24,39,0.8);
     border: 1px solid rgba(255,255,255,0.07);

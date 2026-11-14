@@ -23,11 +23,13 @@ type indexedData struct {
 }
 
 type dataCache struct {
-	main    *snapshot.Cache[indexedData]
-	mu      sync.Mutex
-	backups map[string]*snapshot.Cache[indexedData]
-	ctx     context.Context
-	store   storage.DataStore
+	main      *snapshot.Cache[indexedData]
+	mu        sync.Mutex
+	backups   map[string]*snapshot.Cache[indexedData]
+	ctx       context.Context
+	store     storage.DataStore
+	startOnce sync.Once
+	startDone chan struct{}
 }
 
 var (
@@ -52,7 +54,7 @@ func activeCache() *dataCache {
 }
 
 func newDataCache(ctx context.Context, store storage.DataStore) *dataCache {
-	cache := &dataCache{ctx: ctx, store: store, backups: make(map[string]*snapshot.Cache[indexedData])}
+	cache := &dataCache{ctx: ctx, store: store, backups: make(map[string]*snapshot.Cache[indexedData]), startDone: make(chan struct{})}
 	path := dataFilePath(JSONFileName)
 	cache.main = snapshot.New(ctx, "charging data", cacheTimeout,
 		func(ctx context.Context) (snapshot.Value[indexedData], error) {
@@ -115,8 +117,56 @@ func dataTTL() time.Duration {
 	return time.Duration(settings.GetDataTTLMinutes()) * time.Minute
 }
 
+func (c *dataCache) refreshTTL() time.Duration {
+	if c.main.Status().Err != nil {
+		return 0
+	}
+	return dataTTL()
+}
+
 func canRefresh() bool {
 	return os.Getenv("WATTPILOT_KEY") != ""
+}
+
+// start attempts a live fetch once per process before any persisted data is served.
+func (c *dataCache) start(ctx context.Context) error {
+	c.startOnce.Do(func() {
+		go func() {
+			defer close(c.startDone)
+			if canRefresh() {
+				_, _ = c.main.Refresh(c.ctx)
+			}
+		}()
+	})
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-c.startDone:
+		return nil
+	}
+}
+
+func (c *dataCache) mainData(ctx context.Context) (snapshot.Value[indexedData], error) {
+	if err := c.start(ctx); err != nil {
+		return snapshot.Value[indexedData]{}, err
+	}
+	value, err := c.main.Get(ctx)
+	if ctx.Err() != nil {
+		return snapshot.Value[indexedData]{}, ctx.Err()
+	}
+	if canRefresh() {
+		fresh, refreshErr := c.main.RefreshIfStale(ctx, c.refreshTTL())
+		if ctx.Err() != nil {
+			return snapshot.Value[indexedData]{}, ctx.Err()
+		}
+		if refreshErr == nil {
+			return fresh, nil
+		}
+		if err != nil {
+			return snapshot.Value[indexedData]{}, fmt.Errorf("charging data unavailable: cached=%v, refresh=%w", err, refreshErr)
+		}
+	}
+	return value, err
 }
 
 func monthlyData(value snapshot.Value[indexedData], month string) WattpilotData {
@@ -129,20 +179,27 @@ func monthlyData(value snapshot.Value[indexedData], month string) WattpilotData 
 
 // DataCacheStatus reports process-local charging data freshness without reading storage.
 func DataCacheStatus() snapshot.Status {
-	return activeCache().main.Status()
+	status := activeCache().main.Status()
+	if !canRefresh() && status.Err == nil {
+		status.Err = fmt.Errorf("WATTPILOT_KEY is not set")
+	}
+	return status
 }
 
 // CheckDataFreshness hydrates the cache if needed and starts a background refresh
 // using the same TTL, coalescing, and failure backoff as data requests.
 func CheckDataFreshness(ctx context.Context) snapshot.Status {
 	cache := activeCache()
+	if err := cache.start(ctx); err != nil {
+		return DataCacheStatus()
+	}
 	if _, err := cache.main.Get(ctx); err != nil && ctx.Err() != nil {
-		return cache.main.Status()
+		return DataCacheStatus()
 	}
 	if canRefresh() {
-		cache.main.Revalidate(dataTTL())
+		cache.main.Revalidate(cache.refreshTTL())
 	}
-	return cache.main.Status()
+	return DataCacheStatus()
 }
 
 func statsForMonths(ctx context.Context, months []string) ([]WattpilotData, error) {
@@ -152,11 +209,8 @@ func statsForMonths(ctx context.Context, months []string) ([]WattpilotData, erro
 		}
 	}
 	cache := activeCache()
-	main, mainErr := cache.main.Get(ctx)
+	main, mainErr := cache.mainData(ctx)
 	if mainErr == nil {
-		if canRefresh() {
-			cache.main.Revalidate(dataTTL())
-		}
 		result := make([]WattpilotData, 0, len(months))
 		for _, month := range months {
 			result = append(result, monthlyData(main, month))
@@ -171,23 +225,9 @@ func statsForMonths(ctx context.Context, months []string) ([]WattpilotData, erro
 	for _, month := range months {
 		backup, backupErr := cache.backup(month).Get(ctx)
 		if backupErr != nil {
-			if canRefresh() {
-				refreshed, refreshErr := cache.main.RefreshIfStale(ctx, dataTTL())
-				if refreshErr == nil {
-					result = result[:0]
-					for _, requested := range months {
-						result = append(result, monthlyData(refreshed, requested))
-					}
-					return result, nil
-				}
-				return result, fmt.Errorf("charging data unavailable: main=%v, backup=%v, refresh=%w", mainErr, backupErr, refreshErr)
-			}
 			return result, fmt.Errorf("charging data unavailable: main=%v, backup=%w", mainErr, backupErr)
 		}
 		result = append(result, monthlyData(backup, month))
-	}
-	if canRefresh() {
-		cache.main.Revalidate(dataTTL())
 	}
 	return result, nil
 }

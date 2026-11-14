@@ -54,6 +54,11 @@ func TestDataStatusRefreshesOpenPage(t *testing.T) {
 			})
 			ctx, cancel := context.WithCancel(context.Background())
 			wattpilot.InitCache(ctx)
+			t.Setenv("WATTPILOT_KEY", "")
+			if _, err := wattpilot.GetStatsForMonth(ctx, "2024-06"); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("WATTPILOT_KEY", "test-key")
 			t.Cleanup(func() {
 				cancel()
 				http.DefaultTransport = original
@@ -99,6 +104,11 @@ func TestDataStatusRefreshesOpenPage(t *testing.T) {
 				!strings.Contains(page.Body.String(), test.energy) {
 				t.Fatal("reloaded dashboard does not render the expected snapshot")
 			}
+			warning := `id="data-fallback-warning" class="data-fallback-warning" role="status"`
+			if !strings.Contains(page.Body.String(), warning) ||
+				strings.Contains(page.Body.String(), warning+" hidden") != (test.state == "idle") {
+				t.Fatal("fallback warning visibility does not match refresh result")
+			}
 		})
 	}
 }
@@ -140,8 +150,8 @@ func TestDataRoutesReuseSnapshotAndExposeFreshness(t *testing.T) {
 			if recorder.Header().Get("Cache-Control") != "no-store" {
 				t.Fatal("data response can be cached without checking freshness")
 			}
-			if state := recorder.Header().Get("X-Wattpilot-Refresh-Status"); state != "idle" {
-				t.Fatalf("refresh status = %q, want idle", state)
+			if state := recorder.Header().Get("X-Wattpilot-Refresh-Status"); state != "failed" {
+				t.Fatalf("refresh status = %q, want failed without API key", state)
 			}
 			if _, err := time.Parse(time.RFC3339, recorder.Header().Get("X-Wattpilot-Data-Updated-At")); err != nil {
 				t.Fatalf("missing or invalid snapshot timestamp: %v", err)
@@ -189,9 +199,8 @@ func TestDataRoutesReuseSnapshotAndExposeFreshness(t *testing.T) {
 					!strings.Contains(recorder.Body.String(), `/static/data-freshness.js`) {
 					t.Fatal("page does not track the rendered snapshot for automatic updates")
 				}
-				if strings.Contains(recorder.Body.String(), `role="status"`) ||
-					strings.Contains(recorder.Body.String(), "Checking data freshness...") {
-					t.Fatal("automatic updates must not add visible freshness status UI")
+				if !strings.Contains(recorder.Body.String(), "Live charging data is unavailable. Showing saved data") {
+					t.Fatal("offline cached data warning is missing")
 				}
 			}
 			if test.name == "dashboard" {

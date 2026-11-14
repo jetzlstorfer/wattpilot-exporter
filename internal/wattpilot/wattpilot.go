@@ -173,15 +173,9 @@ func FetchJSON(ctx context.Context, fetchURL string) ([]byte, error) {
 
 func GetJSONData(ctx context.Context) ([]byte, error) {
 	cache := activeCache()
-	value, err := cache.main.Get(ctx)
-	if err != nil && canRefresh() && ctx.Err() == nil {
-		value, err = cache.main.RefreshIfStale(ctx, dataTTL())
-	}
+	value, err := cache.mainData(ctx)
 	if err != nil {
 		return nil, err
-	}
-	if canRefresh() {
-		cache.main.Revalidate(dataTTL())
 	}
 	return slices.Clone(value.Data.json), nil
 }

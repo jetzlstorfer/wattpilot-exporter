@@ -22,7 +22,9 @@ type MonthStat struct {
 // ChartsData is the template context for the charts page.
 type ChartsData struct {
 	DataUpdatedAt string
+	DataFallback  bool
 	Months        []MonthStat
+	Error         string
 }
 
 // ChartHandler handles GET /charts.
@@ -53,7 +55,7 @@ func ChartHandler(templateDir string) http.HandlerFunc {
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 				return
 			}
-			if execErr := tmpl.Execute(w, ChartsData{Months: []MonthStat{}}); execErr != nil {
+			if execErr := tmpl.Execute(w, ChartsData{Months: []MonthStat{}, Error: "Unable to fetch charging data. Please try refreshing or check back later."}); execErr != nil {
 				slog.ErrorContext(ctx, "chartHandler: template execute error in error path", "error", execErr)
 			}
 			return
@@ -90,7 +92,7 @@ func ChartHandler(templateDir string) http.HandlerFunc {
 			slog.ErrorContext(ctx, "chartHandler: template parse error", "error", err)
 			return
 		}
-		if err := tmpl.Execute(w, ChartsData{DataUpdatedAt: updatedAt, Months: monthStats}); err != nil {
+		if err := tmpl.Execute(w, ChartsData{DataUpdatedAt: updatedAt, DataFallback: wattpilot.DataCacheStatus().Err != nil, Months: monthStats}); err != nil {
 			slog.ErrorContext(ctx, "chartHandler: template execute error", "error", err)
 		}
 	}

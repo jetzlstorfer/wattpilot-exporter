@@ -191,11 +191,10 @@ func TestInvalidMonthsDoNotAllocateBackupCaches(t *testing.T) {
 	}
 }
 
-func TestStaleDataAndBackupsReturnDuringRefresh(t *testing.T) {
+func TestColdStartWaitsForFreshData(t *testing.T) {
 	for _, backup := range []bool{false, true} {
 		t.Run(map[bool]string{false: "main", true: "backup"}[backup], func(t *testing.T) {
 			store := testStore()
-			store.modified = time.Now().Add(-24 * time.Hour)
 			if backup {
 				delete(store.files, dataFilePath(JSONFileName))
 				store.files[getMonthlyBackupFilename("2024-06")] = []byte(cachedJSON)
@@ -213,31 +212,25 @@ func TestStaleDataAndBackupsReturnDuringRefresh(t *testing.T) {
 					return nil, r.Context().Err()
 				}
 			})
-			got, err := GetStatsForMonth(context.Background(), "2024-06")
-			if err != nil || got.Data[0].Energy != 1 {
-				t.Fatalf("initial stale data = %+v, %v", got, err)
-			}
-			if !got.UpdatedAt.Equal(store.modified) {
-				t.Fatalf("rendered snapshot timestamp = %v, want %v", got.UpdatedAt, store.modified)
-			}
+			results := make(chan WattpilotData, 1)
+			errs := make(chan error, 1)
+			go func() {
+				got, err := GetStatsForMonth(context.Background(), "2024-06")
+				results <- got
+				errs <- err
+			}()
 			await(t, started)
-			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-			defer cancel()
-			for range 10 {
-				got, err = GetStatsForMonth(ctx, "2024-06")
-				if err != nil || got.Data[0].Energy != 1 {
-					t.Fatalf("read waited for refresh: %+v, %v", got, err)
-				}
+			select {
+			case <-results:
+				t.Fatal("returned saved data before the live fetch completed")
+			default:
 			}
 			close(release)
-			if _, err := cache.main.RefreshIfStale(context.Background(), dataTTL()); err != nil {
-				t.Fatal(err)
-			}
-			got, err = GetStatsForMonth(context.Background(), "2024-06")
+			got, err := <-results, <-errs
 			if err != nil || got.Data[0].Energy != 9 || calls.Load() != 1 {
 				t.Fatalf("refreshed data = %+v, %v, calls=%d", got, err, calls.Load())
 			}
-			if !got.UpdatedAt.Equal(cache.main.Status().UpdatedAt) || !got.UpdatedAt.After(store.modified) {
+			if !got.UpdatedAt.Equal(cache.main.Status().UpdatedAt) {
 				t.Fatal("refreshed data does not identify its new snapshot")
 			}
 			store.mu.Lock()
@@ -246,6 +239,66 @@ func TestStaleDataAndBackupsReturnDuringRefresh(t *testing.T) {
 			}
 			store.mu.Unlock()
 		})
+	}
+}
+
+func TestColdStartFailureFallsBack(t *testing.T) {
+	for _, backup := range []bool{false, true} {
+		t.Run(map[bool]string{false: "main", true: "backup"}[backup], func(t *testing.T) {
+			store := testStore()
+			if backup {
+				delete(store.files, dataFilePath(JSONFileName))
+				store.files[getMonthlyBackupFilename("2024-06")] = []byte(cachedJSON)
+			}
+			useDataCache(t, store)
+			var calls atomic.Int32
+			useAPI(t, func(*http.Request) (*http.Response, error) {
+				calls.Add(1)
+				return nil, errors.New("offline")
+			})
+			for range 2 {
+				got, err := GetStatsForMonth(context.Background(), "2024-06")
+				if err != nil || len(got.Data) != 1 || got.Data[0].Energy != 1 {
+					t.Fatalf("fallback = %+v, %v", got, err)
+				}
+				if DataCacheStatus().Err == nil {
+					t.Fatal("fallback did not report failure")
+				}
+			}
+			if calls.Load() != 1 {
+				t.Fatalf("failed refresh not backed off: calls=%d", calls.Load())
+			}
+		})
+	}
+}
+
+func TestExpiredSnapshotWaitsForRefresh(t *testing.T) {
+	store := testStore()
+	store.modified = time.Now().Add(-24 * time.Hour)
+	cache := useDataCache(t, store)
+	if _, err := cache.mainData(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	started, release := make(chan struct{}), make(chan struct{})
+	useAPI(t, func(*http.Request) (*http.Response, error) {
+		close(started)
+		<-release
+		return response(refreshedJSON), nil
+	})
+	results := make(chan WattpilotData, 1)
+	go func() {
+		got, _ := GetStatsForMonth(context.Background(), "2024-06")
+		results <- got
+	}()
+	await(t, started)
+	select {
+	case <-results:
+		t.Fatal("returned expired data before refresh completed")
+	default:
+	}
+	close(release)
+	if got := <-results; len(got.Data) != 1 || got.Data[0].Energy != 9 {
+		t.Fatalf("expected refreshed data, got %+v", got)
 	}
 }
 
@@ -264,6 +317,9 @@ func TestFreshnessChecksRespectTTL(t *testing.T) {
 			store := testStore()
 			store.modified = time.Now().Add(-test.age)
 			cache := useDataCache(t, store)
+			if err := cache.start(context.Background()); err != nil {
+				t.Fatal(err)
+			}
 			started, release := make(chan struct{}), make(chan struct{})
 			var calls atomic.Int32
 			if test.key {
@@ -284,7 +340,7 @@ func TestFreshnessChecksRespectTTL(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 				status := CheckDataFreshness(ctx)
 				cancel()
-				if status.Err != nil || status.Refreshing != test.refresh || !status.UpdatedAt.Equal(store.modified) {
+				if (status.Err != nil) != !test.key || status.Refreshing != test.refresh || !status.UpdatedAt.Equal(store.modified) {
 					t.Fatalf("freshness status = %+v", status)
 				}
 			}
