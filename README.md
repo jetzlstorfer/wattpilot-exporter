@@ -18,7 +18,7 @@ A lightweight Go web application that fetches EV charging session data from [Fro
 - **Entra ID authentication** — Azure Easy Auth restricts access to your Azure AD tenant
 - **Custom domain support** — CNAME + managed TLS certificate configured in Bicep
 - **Live charging indicator** — dashboard status banner on the current month view that appears when charging seems active based on recent session updates
-- **Cached-page-first loading** — process-local charging snapshots and forecasts avoid repeated storage reads; stale data remains available while one background refresh runs
+- **Fresh charging data** — startup and expired snapshots are refreshed before serving; saved data remains available if refresh fails
 - **Data caching and backup fallback** — local filesystem or Azure Blob Storage provides persistence; monthly backups are stored as `data/*_backup.json`; use `/refresh` to force a refresh
 - **OpenTelemetry observability** — automatic HTTP request traces, app-level spans, and structured logs
 - **Docker support** — multi-stage Docker build for minimal container images
@@ -82,20 +82,21 @@ so saving settings takes effect without refreshing charging data.
 - **Freshness:** the Settings page controls the charging data TTL (default 30 minutes)
   and forecast TTL (default 120 minutes). These control when requests trigger refreshes;
   they are not background polling schedules.
-- **Stale-while-revalidate:** requests return valid cached data immediately, even when
-  it is stale. The first such request starts one background refresh; concurrent requests
-  share that work instead of queueing duplicate API calls. Dashboard and charts pages
+- **Charging refresh:** the first request after startup attempts a live fetch, even if a
+  saved snapshot is within its TTL. Later requests wait for a refresh when the snapshot
+  expires; concurrent requests share that work instead of queueing duplicate API calls.
+  If fetching fails, the app serves saved data and displays a warning on the dashboard
+  and charts. Dashboard and charts pages
   check `/data-status` every 30 seconds while visible (every second during a refresh)
   and reload automatically when a newer snapshot is available, preserving the URL and
   selected month. Returning to a tab checks immediately. These checks also trigger
   TTL-based refreshes for pages left open; they do not force a fetch before the TTL.
-  Refresh checks do not add visible status UI; failures are reported in the browser
-  console while cached data stays visible and checks continue. This requires JavaScript;
+  Refresh failures are shown on the page while saved data stays visible and checks
+  continue. Automatic checks require JavaScript;
   without it, reload the page to see updates.
-- **Cold cache:** a new process reads persisted data first. Missing or corrupt charging
-  data falls back to validated monthly backups. Only when no usable snapshot or required
-  backup exists does the request wait for a fetch. Forecasts follow the same cached-first
-  policy, with separate persisted files for each coordinate pair so location changes
+- **Cold cache:** if the live fetch fails, a new process reads persisted charging data;
+  missing or corrupt main data falls back to validated monthly backups. Forecasts retain
+  a cached-first policy, with separate persisted files for each coordinate pair so location changes
   cannot reuse another location's forecast.
 - **Failure safety:** failed fetches, invalid payloads, and failed main-cache writes
   preserve the previous in-memory and persisted snapshot. Automatic retries back off

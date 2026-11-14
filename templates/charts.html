@@ -56,6 +56,14 @@
 
     <main class="max-w-6xl mx-auto px-6 py-10">
 
+        {{ if .Error }}
+        <div class="data-fallback-warning" role="alert">{{ .Error }}</div>
+        {{ else }}
+        <div id="data-fallback-warning" class="data-fallback-warning" role="status" {{ if not .DataFallback }}hidden{{ end }}>
+            Live charging data is unavailable. Showing saved data. Check the connection and configuration; the app will retry when possible.
+        </div>
+        {{ end }}
+
         <div class="mb-10">
             <p class="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-1">Historical Data</p>
             <h1 class="text-4xl font-extrabold text-white tracking-tight">Charts</h1>

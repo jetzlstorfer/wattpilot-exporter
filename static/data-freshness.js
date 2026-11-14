@@ -1,6 +1,7 @@
 (function () {
     const snapshot = document.getElementById('data-freshness');
     if (!snapshot) return;
+    const warning = document.getElementById('data-fallback-warning');
 
     // Compare against the snapshot actually rendered, not a later status read:
     // a background refresh can finish while the server is rendering the page.
@@ -30,6 +31,7 @@
             if (state === 'refreshing') {
                 delay = 1000;
             } else if (state === 'failed') {
+                if (warning) warning.hidden = false;
                 console.warn('Charging data refresh failed; keeping cached data and retrying automatically.');
             }
         } catch (error) {

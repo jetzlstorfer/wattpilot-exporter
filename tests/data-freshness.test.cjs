@@ -20,6 +20,7 @@ function response(version = oldVersion, state = 'idle', status = 204) {
 
 async function browser(responses, { renderedAt = oldVersion, hidden = false, element = true } = {}) {
     const snapshot = { dataset: { updatedAt: renderedAt } };
+    const warning = { hidden: true };
     Object.defineProperty(snapshot, 'textContent', {
         set() { assert.fail('freshness checks must not write UI status text'); },
     });
@@ -31,7 +32,7 @@ async function browser(responses, { renderedAt = oldVersion, hidden = false, ele
     let reloads = 0;
     const document = {
         hidden,
-        getElementById: () => element ? snapshot : null,
+        getElementById: (id) => !element ? null : id === 'data-freshness' ? snapshot : warning,
         addEventListener: (event, fn) => { listeners[event] = fn; },
     };
     runInNewContext(script, {
@@ -58,7 +59,7 @@ async function browser(responses, { renderedAt = oldVersion, hidden = false, ele
     const flush = () => new Promise(setImmediate);
     await flush();
     return {
-        document, requests, warnings, listeners,
+        document, requests, warnings, listeners, warning,
         get reloads() { return reloads; },
         get delay() { return [...timers.values()][0]?.delay; },
         async tick() {
@@ -109,6 +110,7 @@ test('refresh failures retain cached data and continue checking for recovery', a
     const page = await browser([response(oldVersion, 'failed'), response(newVersion)]);
     assert.equal(page.reloads, 0);
     assert.equal(page.warnings.length, 1);
+    assert.equal(page.warning.hidden, false);
     assert.match(page.warnings[0][0], /refresh failed.*cached data.*retrying automatically/);
     assert.equal(page.delay, 30000);
     await page.tick();
